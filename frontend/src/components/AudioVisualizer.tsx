@@ -23,6 +23,7 @@ export default function AudioVisualizer({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | MediaElementAudioSourceNode | null>(null);
   const historyRef = useRef<number[][]>([]);
+  const particlesRef = useRef<any[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -44,6 +45,32 @@ export default function AudioVisualizer({
     // Initialize Web Audio API
     let analyser: AnalyserNode | null = null;
     let audioContext: AudioContext | null = null;
+
+    // Initialize 3D particles if empty
+    if (particlesRef.current.length === 0) {
+      const count = 120;
+      const pts = [];
+      for (let i = 0; i < count; i++) {
+        const phi = Math.acos(-1 + (2 * i) / count);
+        const theta = Math.sqrt(count * Math.PI) * phi;
+        const r = 90; // sphere base radius
+        const x = r * Math.sin(phi) * Math.cos(theta);
+        const y = r * Math.sin(phi) * Math.sin(theta);
+        const z = r * Math.cos(phi);
+        
+        const h = 230 + (i / count) * 70;
+        const color = `hsla(${h}, 95%, 70%, 1)`;
+        
+        pts.push({
+          x, y, z,
+          baseX: x, baseY: y, baseZ: z,
+          color,
+          speed: Math.random() * 0.015 + 0.005,
+          size: Math.random() * 2.5 + 1.2
+        });
+      }
+      particlesRef.current = pts;
+    }
 
     const cleanupAudio = () => {
       if (sourceNodeRef.current) {
@@ -108,6 +135,9 @@ export default function AudioVisualizer({
 
     // Render loop
     let idlePhase = 0;
+    let yaw = 0;
+    let pitch = 0;
+    let roll = 0;
     const bufferLength = analyserRef.current ? analyserRef.current.frequencyBinCount : 256;
     const dataArray = new Uint8Array(bufferLength);
 
@@ -168,6 +198,18 @@ export default function AudioVisualizer({
           }
         }
       }
+
+      // Calculate average audio frequency level for orbital speeds
+      let sumFreq = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sumFreq += dataArray[i];
+      }
+      const avgFreq = sumFreq / (bufferLength || 1);
+      
+      // Update rotation angles dynamically relative to audio volume
+      yaw += 0.003 + (isActive ? avgFreq * 0.00012 : 0);
+      pitch += 0.002 + (isActive ? avgFreq * 0.00008 : 0);
+      roll += 0.001;
 
       // --- STYLES DRAW LOGIC ---
       if (style === 'bars') {
@@ -299,6 +341,109 @@ export default function AudioVisualizer({
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
+        }
+      } else if (style === '3d-particle-orbit') {
+        // 3D Cyber Orbit Sphere visualizer
+        const particles = particlesRef.current;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        const fov = 180;
+        const distance = 200;
+        
+        // 1. Calculate projected coordinates for all particles
+        const projectedPoints: { x: number; y: number; z: number; size: number; color: string; val: number; alpha: number }[] = [];
+        
+        for (let i = 0; i < particles.length; i++) {
+          const pt = particles[i];
+          const val = dataArray[i % bufferLength] / 255;
+          
+          // Warp sphere radius dynamically with frequency
+          const warp = 1.0 + (isActive ? val * 0.65 : Math.sin(idlePhase + i) * 0.15);
+          const rx = pt.baseX * warp;
+          const ry = pt.baseY * warp;
+          const rz = pt.baseZ * warp;
+          
+          // Rotate coordinates around Y-axis (yaw)
+          const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
+          const x1 = rx * cosY - rz * sinY;
+          const z1 = rx * sinY + rz * cosY;
+          
+          // Rotate coordinates around X-axis (pitch)
+          const cosX = Math.cos(pitch), sinX = Math.sin(pitch);
+          const y2 = ry * cosX - z1 * sinX;
+          const z2 = ry * sinX + z1 * cosX;
+          
+          // Rotate coordinates around Z-axis (roll)
+          const cosZ = Math.cos(roll), sinZ = Math.sin(roll);
+          const x3 = x1 * cosZ - y2 * sinZ;
+          const y3 = x1 * sinZ + y2 * cosZ;
+          
+          // Perspective projection
+          const perspective = fov / (fov + z2 + distance);
+          const px = centerX + x3 * perspective * 1.5;
+          const py = centerY + y3 * perspective * 1.5;
+          
+          // Size & color properties scaled by depth z2
+          const size = pt.size * perspective * (1.0 + (isActive ? val * 1.3 : 0));
+          
+          // Calculate opacity: front is solid, back is faded
+          const alpha = Math.max(0.15, Math.min(0.9, 0.5 + (z2 / 120)));
+          
+          projectedPoints.push({
+            x: px,
+            y: py,
+            z: z2,
+            size,
+            color: pt.color,
+            val,
+            alpha
+          });
+        }
+        
+        // 2. Draw connections (Translucent glowing mesh connections)
+        // To keep it 60 FPS, connect systematically in $O(N)$
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i < projectedPoints.length; i++) {
+          const ptA = projectedPoints[i];
+          
+          // Connect to next neighbor and neighbor 4 steps ahead to form a beautiful wireframe cage
+          const neighbors = [(i + 1) % projectedPoints.length, (i + 4) % projectedPoints.length];
+          
+          for (const nextIdx of neighbors) {
+            const ptB = projectedPoints[nextIdx];
+            
+            // Only connect if close enough to avoid long unsightly stretch lines
+            const dist = Math.sqrt(Math.pow(ptA.x - ptB.x, 2) + Math.pow(ptA.y - ptB.y, 2));
+            if (dist < 100) {
+              const gradient = ctx.createLinearGradient(ptA.x, ptA.y, ptB.x, ptB.y);
+              gradient.addColorStop(0, ptA.color.replace('1)', `${Math.min(ptA.alpha, ptB.alpha) * 0.15})`));
+              gradient.addColorStop(1, ptB.color.replace('1)', `${Math.min(ptA.alpha, ptB.alpha) * 0.15})`));
+              
+              ctx.strokeStyle = gradient;
+              ctx.beginPath();
+              ctx.moveTo(ptA.x, ptA.y);
+              ctx.lineTo(ptB.x, ptB.y);
+              ctx.stroke();
+            }
+          }
+        }
+        
+        // 3. Draw particles sorted by depth (painter's algorithm) so front particles cover back ones
+        const sortedPoints = [...projectedPoints].sort((a, b) => a.z - b.z);
+        for (const pt of sortedPoints) {
+          ctx.beginPath();
+          
+          // Outer neon glow ring
+          ctx.arc(pt.x, pt.y, pt.size * 1.6, 0, Math.PI * 2);
+          ctx.fillStyle = pt.color.replace('1)', `${pt.alpha * 0.25})`);
+          ctx.fill();
+          
+          // Inner solid core
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+          ctx.fillStyle = pt.color.replace('1)', `${pt.alpha})`);
+          ctx.fill();
         }
       } else {
         // 4. Cyber Sine Wave Style (Default)

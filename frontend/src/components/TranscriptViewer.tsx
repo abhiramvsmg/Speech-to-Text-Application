@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, FileText, Clipboard, Download, Check, 
-  BookOpen, CheckSquare, Languages, FileCheck2, Loader2, Save, Trash2
+  BookOpen, CheckSquare, Languages, FileCheck2, Loader2, Save, Trash2,
+  Send, MessageSquare
 } from 'lucide-react';
 import { api, TranscriptRecord } from '@/lib/api';
 
@@ -13,7 +14,7 @@ interface TranscriptViewerProps {
   onDelete: (id: string) => void;
 }
 
-type TabType = 'original' | 'summary' | 'action_items' | 'translation' | 'polished';
+type TabType = 'original' | 'summary' | 'action_items' | 'translation' | 'polished' | 'copilot';
 
 export default function TranscriptViewer({ record, onUpdate, onDelete }: TranscriptViewerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('original');
@@ -27,6 +28,11 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
   const [targetLang, setTargetLang] = useState('Spanish');
   const [tone, setTone] = useState('professional');
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Ask Copilot chat states
+  const [chatThreads, setChatThreads] = useState<Record<string, { role: 'user' | 'assistant'; content: string }[]>>({});
+  const [chatInput, setChatInput] = useState('');
+  const [isSendingChat, setIsSendingChat] = useState(false);
 
   useEffect(() => {
     if (record) {
@@ -111,6 +117,52 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
       setAiError(err.message || 'AI engine failed to analyze speech. Check keys.');
     } finally {
       setLoadingAction(null);
+    }
+  };
+
+  const currentThread = record ? (chatThreads[record.id] || []) : [];
+
+  const handleSendMessage = async (customMessage?: string) => {
+    if (!record) return;
+    const textToSend = customMessage || chatInput;
+    if (!textToSend.trim() || isSendingChat) return;
+    
+    if (!customMessage) setChatInput('');
+    
+    const userMsg = { role: 'user' as const, content: textToSend };
+    const updatedThread = [...currentThread, userMsg];
+    
+    setChatThreads(prev => ({
+      ...prev,
+      [record.id]: updatedThread
+    }));
+    
+    setIsSendingChat(true);
+    try {
+      const provider = (localStorage.getItem('aiProvider') as 'gemini' | 'deepinfra') || 'gemini';
+      const apiKey = localStorage.getItem('aiKey') || '';
+      
+      const res = await api.askCopilot({
+        id: record.id,
+        messages: updatedThread.map(m => ({ role: m.role, content: m.content })),
+        provider,
+        api_key: apiKey
+      });
+      
+      const assistantMsg = { role: 'assistant' as const, content: res.result };
+      setChatThreads(prev => ({
+        ...prev,
+        [record.id]: [...updatedThread, assistantMsg]
+      }));
+    } catch (err: any) {
+      console.error(err);
+      const errMsg = { role: 'assistant' as const, content: `⚠️ **Error:** ${err.message || 'Failed to connect to Copilot.'}` };
+      setChatThreads(prev => ({
+        ...prev,
+        [record.id]: [...updatedThread, errMsg]
+      }));
+    } finally {
+      setIsSendingChat(false);
     }
   };
 
@@ -204,6 +256,7 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
           { id: 'summary', name: 'AI Summary', icon: Sparkles },
           { id: 'action_items', name: 'Action Items', icon: CheckSquare },
           { id: 'translation', name: 'Translation', icon: Languages },
+          { id: 'copilot', name: 'Ask Copilot', icon: MessageSquare },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -475,6 +528,100 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Tab 5: Ask AI Copilot Chat */}
+        {activeTab === 'copilot' && (
+          <div className="flex flex-col h-full min-h-[300px] max-h-[40vh]">
+            {/* Scrollable chat content trail */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-3.5 max-h-[30vh] min-h-[200px]">
+              {currentThread.length === 0 ? (
+                <div className="space-y-4 py-2">
+                  <div className="flex flex-col items-center justify-center text-center py-4 space-y-2">
+                    <div className="w-12 h-12 rounded-full bg-violet-600/10 flex items-center justify-center border border-violet-500/20">
+                      <MessageSquare className="w-6 h-6 text-violet-400 shadow-sm" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <h4 className="text-white text-xs font-extrabold tracking-wider uppercase">Interactive Copilot Chat</h4>
+                      <p className="text-gray-400 text-[10px] max-w-xs leading-relaxed">
+                        Converse directly with the AI about this transcript. Draft communications, isolate deliverables, or check grammar.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Quick-Prompt helper chips */}
+                  <div className="grid grid-cols-2 gap-2 max-w-md mx-auto">
+                    {[
+                      { label: "📧 Draft Email Summary", text: "Draft a professional email summary of this voice note that I can send to my team." },
+                      { label: "📋 Extract Urgent Tasks", text: "Isolate all urgent tasks and follow-up items from this recording." },
+                      { label: "🔍 Explain Concepts", text: "Explain the main discussion topics and core concepts covered in this transcript." },
+                      { label: "💡 Write Action Draft", text: "Write a high-level action draft or newsletter based on the transcript contents." }
+                    ].map((chip, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSendMessage(chip.text)}
+                        className="p-2 text-[10px] font-semibold text-left bg-gradient-to-r from-white/[0.02] to-[#8b5cf6]/[0.01] hover:from-white/[0.04] hover:to-[#8b5cf6]/[0.03] border border-white/5 hover:border-violet-500/20 rounded-lg text-gray-300 hover:text-white transition-all cursor-pointer shadow-sm"
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {currentThread.map((msg, idx) => (
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-violet-600 text-white shadow-md rounded-tr-none'
+                          : 'bg-white/5 border border-white/10 text-gray-200 shadow-md rounded-tl-none font-medium'
+                      }`}>
+                        {msg.content.split('\n').map((line, lIdx) => {
+                          if (line.startsWith('- [ ]') || line.startsWith('- [x]')) {
+                            return (
+                              <div key={lIdx} className="flex items-center space-x-1.5 my-1 pl-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                                <span>{line.replace(/- \[[x ]\]/g, '').trim()}</span>
+                              </div>
+                            );
+                          }
+                          return <p key={lIdx} className="my-0.5">{line}</p>;
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isSendingChat && (
+                <div className="flex justify-start">
+                  <div className="bg-white/5 border border-white/10 text-gray-400 rounded-xl px-3 py-2 text-xs flex items-center space-x-2 rounded-tl-none font-medium">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
+                    <span>Copilot is typing...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Input message form */}
+            <div className="flex items-center space-x-2 border-t border-white/5 pt-3 mt-3">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Ask the AI Copilot a question about this log..."
+                className="flex-1 py-2 px-3 text-xs bg-black/40 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-white transition-colors"
+                disabled={isSendingChat}
+              />
+              <button
+                onClick={() => handleSendMessage()}
+                disabled={isSendingChat || !chatInput.trim()}
+                className="p-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSendingChat ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         )}
       </div>

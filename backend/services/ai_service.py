@@ -266,3 +266,136 @@ class AIService:
             return markdown
             
         return text
+
+    @staticmethod
+    def chat(text, messages, provider="gemini", api_key=None):
+        """
+        Runs conversational AI on top of the transcript text context.
+        Injects the transcript text into the system prompt along with previous dialogue.
+        """
+        if not text or not text.strip():
+            return "No transcription text context found to chat about."
+        if not messages:
+            return "No chat history provided."
+
+        print(f"[AIService] Chatting with copilot (provider={provider}, history_len={len(messages)})")
+
+        # 1. Format the conversation history and transcript context into a single LLM prompt
+        prompt = AIService._get_chat_prompt(text, messages)
+
+        # 2. Try Gemini API if requested/available
+        if provider == "gemini":
+            key = api_key or os.getenv("GEMINI_API_KEY")
+            if key:
+                try:
+                    return AIService._call_gemini(prompt, key)
+                except Exception as e:
+                    print(f"[AIService] Gemini Chat API error: {e}. Falling back...")
+            else:
+                print("[AIService] No Gemini API key found for chat. Trying DeepInfra or Heuristic Fallback...")
+
+        # 3. Try DeepInfra API if requested/available
+        if provider == "deepinfra" or (not api_key and os.getenv("DEEPINFRA_API_KEY")):
+            key = api_key or os.getenv("DEEPINFRA_API_KEY")
+            if key:
+                try:
+                    return AIService._call_deepinfra(prompt, key)
+                except Exception as e:
+                    print(f"[AIService] DeepInfra Chat API error: {e}. Falling back...")
+            else:
+                print("[AIService] No DeepInfra API key found for chat. Falling back to Heuristic Engine...")
+
+        # 4. Heuristic fallback conversation
+        return AIService._heuristic_chat_fallback(text, messages)
+
+    @staticmethod
+    def _get_chat_prompt(text, messages):
+        history_str = ""
+        for msg in messages[:-1]:
+            role_label = "User" if msg.get("role") == "user" else "Assistant"
+            history_str += f"{role_label}: {msg.get('content')}\n\n"
+        
+        last_user_query = messages[-1].get("content")
+        
+        prompt = (
+            "You are an expert executive voice companion and AI Copilot for AURA.transcript.\n"
+            "The user recorded a voice memo. Here is the transcript of their voice note:\n"
+            "\"\"\"\n"
+            f"{text}\n"
+            "\"\"\"\n\n"
+            "Here is the dialogue history of your conversation with the user so far:\n"
+            f"{history_str}"
+            "Answer the user's latest follow-up question regarding the voice note.\n"
+            "Guidelines:\n"
+            "- Be direct, friendly, and extremely concise.\n"
+            "- Use clean Markdown bullet points and bold styling where appropriate.\n"
+            "- Keep your response relevant strictly to the voice note context unless asked to brainstorm or compose.\n\n"
+            f"User's Latest Question: \"{last_user_query}\"\n"
+            "Assistant:"
+        )
+        return prompt
+
+    @staticmethod
+    def _heuristic_chat_fallback(text, messages):
+        last_query = messages[-1].get("content", "").lower()
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+        
+        response = ""
+        
+        if "email" in last_query or "draft" in last_query or "send" in last_query:
+            summary_sentences = sentences[:3] if len(sentences) >= 3 else sentences
+            summary_text = " ".join(summary_sentences)
+            response = (
+                "Here is a professional email draft based on your voice log:\n\n"
+                "**Subject:** Follow-up: Summary of Voice Recording Discussion\n\n"
+                "Hi Team,\n\n"
+                "I wanted to share a quick summary of the points discussed in my recent voice memo:\n\n"
+                f"- *Core Discussion:* {summary_text}\n"
+                "- *Action Items:* Review the attached voice log archive for specific assignments.\n\n"
+                "Please let me know if you have any questions or feedback.\n\n"
+                "Best regards,\n"
+                "[Your Name]"
+            )
+        elif "task" in last_query or "todo" in last_query or "action" in last_query:
+            tasks = []
+            for s in sentences:
+                if any(k in s.lower() for k in ["need", "should", "will", "must", "going to"]):
+                    tasks.append(s)
+            
+            if not tasks:
+                tasks = sentences[:2]
+                
+            task_list = "\n".join([f"- [ ] {t}" for t in tasks])
+            response = (
+                "Based on the transcript context, I have isolated the following action items:\n\n"
+                f"{task_list}\n\n"
+                "I've labeled these as unassigned. Let me know if you'd like to assign them to specific team members."
+            )
+        elif "risk" in last_query or "problem" in last_query or "issue" in last_query:
+            problems = []
+            for s in sentences:
+                if any(k in s.lower() for k in ["problem", "issue", "bug", "risk", "fail", "slow", "error"]):
+                    problems.append(s)
+            if problems:
+                problems_str = "\n".join([f"- ⚠️ {p}" for p in problems])
+                response = (
+                    "I identified the following risks/issues within your voice log:\n\n"
+                    f"{problems_str}"
+                )
+            else:
+                response = (
+                    "No immediate project risks, errors, or obstacles were detected in the transcript vocabulary."
+                )
+        else:
+            selected_s = sentences[0] if sentences else "your audio recording"
+            response = (
+                f"I analyzed your voice note. Regarding your question, the transcript highlights: **\"{selected_s}\"**\n\n"
+                "Please let me know if you would like me to draft communications, isolate specific keywords, or format this further!"
+            )
+            
+        response += (
+            "\n\n> [!NOTE]\n"
+            "> This reply was generated by the Heuristic Chat Engine. "
+            "To activate full conversational LLM reasoning, please configure your Gemini API Key in Settings."
+        )
+        return response

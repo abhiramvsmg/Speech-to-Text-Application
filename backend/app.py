@@ -188,6 +188,47 @@ def analyze_transcript():
         print(f"[App] AI analysis endpoint error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/ai/chat', methods=['POST'])
+def chat_copilot():
+    """
+    Endpoint for conversing with the AI Copilot.
+    Accepts: JSON body with:
+      - 'id': ID of the transcript
+      - 'messages': List of past messages e.g. [{"role": "user"|"assistant", "content": string}]
+      - 'provider': 'gemini' or 'deepinfra'
+      - 'api_key': client-provided API key
+    """
+    data = request.get_json() or {}
+    transcript_id = data.get('id')
+    messages = data.get('messages', [])
+    provider = data.get('provider', 'gemini')
+    api_key = data.get('api_key')
+    
+    if not transcript_id or not messages:
+        return jsonify({"error": "Missing required fields: id and messages"}), 400
+        
+    record = get_transcript(transcript_id)
+    if not record:
+        return jsonify({"error": "Transcript record not found"}), 404
+        
+    try:
+        # Run AI conversation
+        chat_response = AIService.chat(
+            text=record['text'],
+            messages=messages,
+            provider=provider,
+            api_key=api_key
+        )
+        
+        return jsonify({
+            "status": "success",
+            "result": chat_response
+        }), 200
+        
+    except Exception as e:
+        print(f"[App] AI Copilot chat endpoint error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/transcripts', methods=['GET'])
 def list_transcripts():
     """Retrieve list of all saved transcriptions, optional search ?q="""

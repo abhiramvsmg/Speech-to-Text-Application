@@ -154,6 +154,29 @@ export const api = {
     return response.ok;
   },
 
+  /** Converse with the AI Copilot about a specific transcript */
+  async askCopilot(params: {
+    id: string;
+    messages: { role: 'user' | 'assistant'; content: string }[];
+    provider?: 'gemini' | 'deepinfra';
+    api_key?: string;
+  }): Promise<{ status: string; result: string }> {
+    const response = await fetch(`${API_BASE}/api/ai/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `Copilot chat failed with status ${response.status}`);
+    }
+
+    return response.json();
+  },
+
   /** Get streamable URL for playing back saved WAV file */
   getAudioUrl(filename: string): string {
     return `${API_BASE}/api/audio/${filename}`;

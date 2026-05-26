@@ -191,6 +191,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <option value="bars">Neon Frequency Bars</option>
                   <option value="circle">Glow Pulsing Ring</option>
                   <option value="3d-spectrogram">3D Cascading Terrain</option>
+                  <option value="3d-particle-orbit">3D Cyber Orbit Sphere</option>
                 </select>
               </div>
             </div>
