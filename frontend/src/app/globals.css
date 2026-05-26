@@ -1,0 +1,412 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card-bg: var(--card-bg);
+  --color-border-glow: var(--border-glow);
+  --color-glow-primary: var(--glow-primary);
+  --color-glow-secondary: var(--glow-secondary);
+}
+
+:root {
+  --background: #030206;
+  --foreground: #f3f1f7;
+  
+  --card-bg: rgba(10, 8, 18, 0.6);
+  --border-glow: rgba(139, 92, 246, 0.15);
+  
+  --glow-primary: #8b5cf6;
+  --glow-secondary: #ec4899;
+  --glow-tertiary: #3b82f6;
+  --glow-success: #10b981;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* --- High-Fidelity Cyber Background Grid --- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(139, 92, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center center;
+  z-index: -2;
+  pointer-events: none;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: -10%;
+  left: -10%;
+  right: -10%;
+  bottom: -10%;
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(80px);
+  animation: bg-drift 25s infinite alternate ease-in-out;
+}
+
+@keyframes bg-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(2%, 3%) scale(1.05); }
+  100% { transform: translate(-1%, -2%) scale(0.98); }
+}
+
+/* --- Glassmorphism Core Elements --- */
+.glass-panel {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.37),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel-hover:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 
+    0 12px 40px 0 rgba(139, 92, 246, 0.12),
+    0 0 15px 1px rgba(139, 92, 246, 0.05),
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+/* --- Glowing Neon Buttons --- */
+.btn-neon-primary {
+  position: relative;
+  background: linear-gradient(135deg, var(--glow-primary), #7c3aed);
+  color: white;
+  border-radius: 8px;
+  font-weight: 500;
+  box-shadow: 0 4px 14px 0 rgba(139, 92, 246, 0.35);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.btn-neon-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 
+    0 6px 20px 0 rgba(139, 92, 246, 0.5),
+    0 0 10px 2px rgba(139, 92, 246, 0.2);
+}
+
+.btn-neon-primary::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.15), 
+    transparent
+  );
+  transform: rotate(45deg) translate(-70%, -70%);
+  transition: all 0.6s ease;
+}
+
+.btn-neon-primary:hover::after {
+  transform: rotate(45deg) translate(70%, 70%);
+}
+
+.btn-neon-secondary {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-neon-secondary:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 12px 1px rgba(139, 92, 246, 0.15);
+}
+
+/* --- Animated Scan Laser Line --- */
+.scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--glow-primary), transparent);
+  box-shadow: 0 0 8px 1px var(--glow-primary);
+  animation: scan 2.5s infinite linear;
+  pointer-events: none;
+}
+
+@keyframes scan {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* --- Dynamic Typing / Writing Loader --- */
+.writing-indicator span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--glow-primary);
+  margin-right: 4px;
+  animation: wave 1.2s infinite ease-in-out;
+}
+
+.writing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.writing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes wave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* --- Breathing Recording Aura --- */
+.recording-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid var(--glow-secondary);
+  animation: ring-pulse 1.8s infinite cubic-bezier(0.25, 0, 0, 1);
+  pointer-events: none;
+}
+
+@keyframes ring-pulse {
+  0% { transform: scale(0.9); opacity: 1; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+/* --- Custom Scrollbar styling --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 8, 18, 0.4);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.25);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+
+/* --- Smooth Entrance Transitions --- */
+.animate-fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Glowing Stats Grid --- */
+.stats-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.stats-glow::before {
+  content: "";
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+  top: -75px;
+  right: -75px;
+  pointer-events: none;
+}
+
+/* --- Premium 3D depth offsets & animations --- */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+/* 3D stacked physical card effects */
+.shadow-3d-card {
+  box-shadow: 
+    0 5px 15px rgba(0, 0, 0, 0.5),
+    0 15px 35px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 2px rgba(255, 255, 255, 0.15);
+}
+
+.shadow-3d-glow {
+  box-shadow: 
+    0 0 25px 0px rgba(139, 92, 246, 0.15),
+    0 10px 30px 0px rgba(10, 8, 18, 0.7),
+    inset 0 1px 1px 0px rgba(255, 255, 255, 0.08);
+}
+
+/* 3D button press physical click effects */
+.btn-3d-press {
+  transition: all 0.12s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform: translate3d(0, 0, 0);
+  box-shadow: 
+    0 4px 0px 0px rgba(91, 33, 182, 0.8),
+    0 4px 12px 0px rgba(139, 92, 246, 0.3);
+}
+
+.btn-3d-press:active {
+  transform: translate3d(0, 3px, 0);
+  box-shadow: 
+    0 1px 0px 0px rgba(91, 33, 182, 0.8),
+    0 1px 4px 0px rgba(139, 92, 246, 0.2);
+}
+
+.btn-3d-press-pink {
+  transition: all 0.12s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform: translate3d(0, 0, 0);
+  box-shadow: 
+    0 4px 0px 0px rgba(190, 24, 74, 0.8),
+    0 4px 12px 0px rgba(236, 72, 153, 0.3);
+}
+
+.btn-3d-press-pink:active {
+  transform: translate3d(0, 3px, 0);
+  box-shadow: 
+    0 1px 0px 0px rgba(190, 24, 74, 0.8),
+    0 1px 4px 0px rgba(236, 72, 153, 0.2);
+}
+
+/* Cybernetic Glare Overlay base */
+.glare-3d-shine {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Generative particle shimmer keyframe */
+@keyframes particle-shimmer {
+  0% { transform: translateY(0px) rotate(0deg); opacity: 0; }
+  50% { opacity: 0.8; }
+  100% { transform: translateY(-80px) rotate(360deg); opacity: 0; }
+}
+
+.animate-shimmer-particle {
+  animation: particle-shimmer 2.5s infinite linear;
+}
+
+/* --- High-End Executive Document Print Dossier --- */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+    padding: 1.5cm !important;
+  }
+
+  body::before,
+  body::after,
+  .print\:hidden,
+  button,
+  select,
+  footer,
+  header {
+    display: none !important;
+  }
+
+  /* Force display only the TranscriptViewer pane on print */
+  .glass-panel {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Make printed text fields readable and spacious */
+  textarea {
+    border: none !important;
+    background: transparent !important;
+    color: #000000 !important;
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 11pt !important;
+    height: auto !important;
+    width: 100% !important;
+    resize: none !important;
+    overflow: visible !important;
+  }
+
+  /* Layout summary items & checklists beautifully */
+  blockquote {
+    border-left: 3pt solid #000000 !important;
+    background: #f7f7f7 !important;
+    color: #333333 !important;
+    padding: 10pt 15pt !important;
+    margin: 15pt 0 !important;
+  }
+
+  /* Custom Corporate dossier header */
+  .glass-panel::before {
+    content: "🎙️ AURA AI EXECUTIVE TRANSCRIPTION SYSTEM\nCLASSIFICATION: CONFIDENTIAL DOSSIER\n-----------------------------------------------------";
+    display: block !important;
+    font-family: monospace !important;
+    font-size: 8pt !important;
+    color: #555555 !important;
+    margin-bottom: 25pt !important;
+    white-space: pre-wrap !important;
+  }
+
+  /* Custom signature block at the bottom of the printed page */
+  .glass-panel::after {
+    content: "\n\n\n\n-----------------------------------------------------\nVERIFIED TRANSCRIPT DOSSIER\nCOMPILED BY AURA SUITE CORE ENGINES\nDATE OF ISSUANCE: 2026-05-26\nSIGNATURE: _________________________________________";
+    display: block !important;
+    font-family: monospace !important;
+    font-size: 9pt !important;
+    color: #333333 !important;
+    margin-top: 50pt !important;
+    white-space: pre-wrap !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Clean page breaks */
+  h4, h3, blockquote {
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  p, div {
+    page-break-inside: auto !important;
+  }
+}
+

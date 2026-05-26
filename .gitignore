@@ -1,0 +1,27 @@
+# Dependencies & Environments
+node_modules/
+.env
+.env*.local
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+# Local Databases & Media Uploads
+backend/instance/
+backend/uploads/*.wav
+backend/uploads/*.webm
+backend/uploads/*.ogg
+backend/uploads/raw_*
+backend/uploads/conv_*
+
+# Next.js Build Outputs
+.next/
+out/
+build/
+dist/
+
+# System / OS
+.DS_Store
+Thumbs.db
