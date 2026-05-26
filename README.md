@@ -133,6 +133,26 @@ graph TD
 
 ---
 
+## 🔄 GitHub Auto-Sync & Real-Time Sync Engines
+
+We have integrated high-performance repository synchronization tools that automate pushes directly to your GitHub repository without requiring manual terminal entry.
+
+### ⚡ 1. Real-Time Auto-Watcher (Zero Interaction)
+Monitor your workspace in the background and automatically push changes whenever you save a file:
+* Run the following command in a terminal pane:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\auto-watcher.ps1
+  ```
+* **How it works:** It establishes a high-frequency `FileSystemWatcher` on your project. When a file is modified (excluding `.git`, `node_modules`, `.next`, and database directories), it waits for **10 seconds of inactivity** to let you finish saving multiple files (debouncing), then automatically runs `git add`, `git commit`, and `git push origin main`.
+
+### 🚀 2. Manual One-Line Sync
+Trigger an instant, interactive workspace synchronization by running:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\git-sync.ps1
+```
+
+---
+
 ## 🔒 Verification & Compliance Manual
 
 *   **Microphone Permissions:** Upon clicking the recording circle, allow the browser mic request.
