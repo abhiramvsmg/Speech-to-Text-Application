@@ -59,15 +59,15 @@ class STTService:
             headers = {
                 "Authorization": f"Bearer {key}"
             }
-            files = {
-                "audio": ("audio.wav", open(audio_path, "rb"), "audio/wav")
-            }
-            # Optional parameters can be supplied in data
-            data = {
-                "language": language.split('-')[0]
-            }
-            
-            response = requests.post(url, headers=headers, files=files, data=data)
+            with open(audio_path, "rb") as audio_file:
+                files = {
+                    "audio": ("audio.wav", audio_file, "audio/wav")
+                }
+                # Optional parameters can be supplied in data
+                data = {
+                    "language": language.split('-')[0]
+                }
+                response = requests.post(url, headers=headers, files=files, data=data)
             
             if response.status_code != 200:
                 raise Exception(f"DeepInfra Whisper API returned error {response.status_code}: {response.text}")
