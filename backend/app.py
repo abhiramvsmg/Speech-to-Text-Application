@@ -243,6 +243,61 @@ def chat_copilot():
         print(f"[App] AI Copilot chat endpoint error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/stats', methods=['GET'])
+def get_system_stats():
+    """Returns comprehensive real-time system stats about files, DB, and environment."""
+    try:
+        import os
+        import shutil
+        from database import get_transcripts, DB_PATH, UPLOADS_DIR
+        
+        # 1. Total records
+        records = get_transcripts()
+        total_logs = len(records)
+        
+        # 2. Pruned logs vs audio logs
+        pruned_logs = len([r for r in records if r.get('audio_filename') is None])
+        active_audio_logs = total_logs - pruned_logs
+        
+        # 3. Total duration
+        total_duration = sum(r.get('duration', 0.0) for r in records)
+        
+        # 4. Storage size on disk
+        total_audio_size = 0
+        if os.path.exists(UPLOADS_DIR):
+            for filename in os.listdir(UPLOADS_DIR):
+                filepath = os.path.join(UPLOADS_DIR, filename)
+                if os.path.isfile(filepath):
+                    total_audio_size += os.path.getsize(filepath)
+        total_audio_size_mb = total_audio_size / (1024.0 * 1024.0)
+        
+        # 5. DB file size
+        db_size_kb = 0
+        if os.path.exists(DB_PATH):
+            db_size_kb = os.path.getsize(DB_PATH) / 1024.0
+            
+        # 6. FFmpeg checker
+        ffmpeg_installed = shutil.which("ffmpeg") is not None
+        
+        return jsonify({
+            "status": "success",
+            "stats": {
+                "total_logs": total_logs,
+                "pruned_logs": pruned_logs,
+                "active_audio_logs": active_audio_logs,
+                "total_duration": total_duration,
+                "audio_size_mb": round(total_audio_size_mb, 2),
+                "db_size_kb": round(db_size_kb, 1),
+                "ffmpeg_installed": ffmpeg_installed,
+                "max_storage_mb": 30,
+                "max_files": 10
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"[App] Stats retrieval error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/transcripts', methods=['GET'])
 def list_transcripts():
     """Retrieve list of all saved transcriptions, optional search ?q="""

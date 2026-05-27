@@ -45,10 +45,12 @@ export default function Page() {
 
     fetchHistory();
     loadVisualizerPreference();
+    loadThemePreference();
 
     // Listen for setting changes
     const handleSettingsUpdate = () => {
       loadVisualizerPreference();
+      loadThemePreference();
     };
 
     window.addEventListener('settings-updated', handleSettingsUpdate);
@@ -60,6 +62,13 @@ export default function Page() {
   const loadVisualizerPreference = () => {
     if (typeof window !== 'undefined') {
       setVisualizerStyle(localStorage.getItem('visualizerStyle') || 'sine');
+    }
+  };
+
+  const loadThemePreference = () => {
+    if (typeof window !== 'undefined') {
+      const theme = localStorage.getItem('theme') || 'aura-dark';
+      document.documentElement.setAttribute('data-theme', theme);
     }
   };
 

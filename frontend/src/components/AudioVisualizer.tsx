@@ -149,6 +149,18 @@ export default function AudioVisualizer({
 
       const isActive = isRecording || (isPlaying && audioElement);
 
+      // Retrieve CSS variable colors dynamically to match dynamic theme settings
+      let primaryColor = '#8b5cf6';
+      let secondaryColor = '#ec4899';
+      let tertiaryColor = '#3b82f6';
+      
+      if (typeof window !== 'undefined') {
+        const rootStyles = getComputedStyle(document.documentElement);
+        primaryColor = rootStyles.getPropertyValue('--glow-primary').trim() || '#8b5cf6';
+        secondaryColor = rootStyles.getPropertyValue('--glow-secondary').trim() || '#ec4899';
+        tertiaryColor = rootStyles.getPropertyValue('--glow-tertiary').trim() || '#3b82f6';
+      }
+
       // 1. Maintain 3D history buffer if requested
       if (style === '3d-spectrogram') {
         const history = historyRef.current;
@@ -224,16 +236,16 @@ export default function AudioVisualizer({
 
           // Glowing gradients
           const gradient = ctx.createLinearGradient(x, height, x, height - barHeight);
-          gradient.addColorStop(0, '#120f26');
-          gradient.addColorStop(0.3, '#7c3aed'); // Primary violet
-          gradient.addColorStop(1, '#ec4899'); // Secondary pink
+          gradient.addColorStop(0, '#0c0b14');
+          gradient.addColorStop(0.3, primaryColor); // Primary theme color
+          gradient.addColorStop(1, secondaryColor); // Secondary theme color
 
           ctx.fillStyle = gradient;
           
           // Draw subtle glowing shadow behind active bars
           if (isActive) {
             ctx.shadowBlur = 10;
-            ctx.shadowColor = 'rgba(139, 92, 246, 0.4)';
+            ctx.shadowColor = primaryColor + '66';
           } else {
             ctx.shadowBlur = 0;
           }
@@ -252,8 +264,8 @@ export default function AudioVisualizer({
         const baseRadius = Math.min(width, height) * 0.25 + (average / 255) * 30;
 
         ctx.shadowBlur = isActive ? 20 : 8;
-        ctx.shadowColor = '#8b5cf6';
-        ctx.strokeStyle = 'rgba(139, 92, 246, 0.85)';
+        ctx.shadowColor = primaryColor;
+        ctx.strokeStyle = primaryColor + 'd9'; // 85% opacity hex
         ctx.lineWidth = 3;
 
         ctx.beginPath();
@@ -280,8 +292,8 @@ export default function AudioVisualizer({
         ctx.beginPath();
         ctx.arc(centerX, centerY, baseRadius * 0.7, 0, Math.PI * 2);
         const innerGlow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, baseRadius * 0.7);
-        innerGlow.addColorStop(0, 'rgba(236, 72, 153, 0.25)'); // Pink core
-        innerGlow.addColorStop(1, 'rgba(139, 92, 246, 0)');
+        innerGlow.addColorStop(0, secondaryColor + '40'); // Theme secondary core (25% opacity)
+        innerGlow.addColorStop(1, primaryColor + '00'); // Theme primary fadeout
         ctx.fillStyle = innerGlow;
         ctx.shadowBlur = 0;
         ctx.fill();
@@ -303,14 +315,13 @@ export default function AudioVisualizer({
           const xCompression = 0.65 + (depthRatio * 0.35); // back is narrower
           const scale = 0.2 + (depthRatio * 0.8); // back is smaller
           
-          // Determine color based on depth: back is deep purple, front is neon violet/pink
-          const r = Math.round(59 + depthRatio * (236 - 59));
-          const g = Math.round(130 + depthRatio * (72 - 130));
-          const b = Math.round(246 + depthRatio * (153 - 246));
+          // Determine color based on depth with theme dynamic colors
           const alpha = 0.1 + (depthRatio * 0.65);
+          const hexAlpha = Math.round(alpha * 255).toString(16).padStart(2, '0');
+          const fillAlpha = Math.round(alpha * 0.08 * 255).toString(16).padStart(2, '0');
           
-          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.08})`; // subtle fill underneath
+          ctx.strokeStyle = primaryColor + hexAlpha;
+          ctx.fillStyle = secondaryColor + fillAlpha; // subtle fill underneath
           
           ctx.beginPath();
           const sliceWidth = (width * xCompression) / frame.length;
@@ -413,12 +424,16 @@ export default function AudioVisualizer({
           for (const nextIdx of neighbors) {
             const ptB = projectedPoints[nextIdx];
             
+            // Recolor dynamic theme connections
+            const colorA = i % 2 === 0 ? primaryColor : secondaryColor;
+            const colorB = nextIdx % 2 === 0 ? primaryColor : secondaryColor;
+            
             // Only connect if close enough to avoid long unsightly stretch lines
             const dist = Math.sqrt(Math.pow(ptA.x - ptB.x, 2) + Math.pow(ptA.y - ptB.y, 2));
             if (dist < 100) {
               const gradient = ctx.createLinearGradient(ptA.x, ptA.y, ptB.x, ptB.y);
-              gradient.addColorStop(0, ptA.color.replace('1)', `${Math.min(ptA.alpha, ptB.alpha) * 0.15})`));
-              gradient.addColorStop(1, ptB.color.replace('1)', `${Math.min(ptA.alpha, ptB.alpha) * 0.15})`));
+              gradient.addColorStop(0, colorA + '26'); // 15% opacity hex
+              gradient.addColorStop(1, colorB + '26');
               
               ctx.strokeStyle = gradient;
               ctx.beginPath();
@@ -431,25 +446,30 @@ export default function AudioVisualizer({
         
         // 3. Draw particles sorted by depth (painter's algorithm) so front particles cover back ones
         const sortedPoints = [...projectedPoints].sort((a, b) => a.z - b.z);
-        for (const pt of sortedPoints) {
+        for (let i = 0; i < sortedPoints.length; i++) {
+          const pt = sortedPoints[i];
           ctx.beginPath();
           
           // Outer neon glow ring
+          const pColor = i % 2 === 0 ? primaryColor : secondaryColor;
+          const alphaHex25 = Math.round(pt.alpha * 0.25 * 255).toString(16).padStart(2, '0');
+          const alphaHexFull = Math.round(pt.alpha * 255).toString(16).padStart(2, '0');
+          
           ctx.arc(pt.x, pt.y, pt.size * 1.6, 0, Math.PI * 2);
-          ctx.fillStyle = pt.color.replace('1)', `${pt.alpha * 0.25})`);
+          ctx.fillStyle = pColor + alphaHex25;
           ctx.fill();
           
           // Inner solid core
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
-          ctx.fillStyle = pt.color.replace('1)', `${pt.alpha})`);
+          ctx.fillStyle = pColor + alphaHexFull;
           ctx.fill();
         }
       } else {
         // 4. Cyber Sine Wave Style (Default)
         ctx.lineWidth = 2.5;
         ctx.shadowBlur = isActive ? 12 : 5;
-        ctx.shadowColor = 'rgba(139, 92, 246, 0.6)';
+        ctx.shadowColor = primaryColor + '99';
 
         // Draw multiple overlapping waves for a glowing fluid ribbon effect
         const wavesCount = 3;
@@ -459,8 +479,9 @@ export default function AudioVisualizer({
           // Separate properties for layered visuals
           const alpha = 0.9 - w * 0.25;
           const scale = 0.5 + w * 0.25;
-          const color = w === 0 ? '#8b5cf6' : w === 1 ? '#ec4899' : '#3b82f6';
-          ctx.strokeStyle = `rgba(${color === '#8b5cf6' ? '139, 92, 246' : color === '#ec4899' ? '236, 72, 153' : '59, 130, 246'}, ${alpha})`;
+          const themeColor = w === 0 ? primaryColor : w === 1 ? secondaryColor : tertiaryColor;
+          const hexAlpha = Math.round(alpha * 255).toString(16).padStart(2, '0');
+          ctx.strokeStyle = themeColor + hexAlpha;
 
           const sliceWidth = width / bufferLength;
           let x = 0;

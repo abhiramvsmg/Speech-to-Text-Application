@@ -46,6 +46,26 @@ export const api = {
     }
   },
 
+  /** Fetch real-time system stats */
+  async getStats(): Promise<{
+    total_logs: number;
+    pruned_logs: number;
+    active_audio_logs: number;
+    total_duration: number;
+    audio_size_mb: number;
+    db_size_kb: number;
+    ffmpeg_installed: boolean;
+    max_storage_mb: number;
+    max_files: number;
+  }> {
+    const response = await fetch(`${API_BASE}/api/stats`);
+    if (!response.ok) {
+      throw new Error('Failed to retrieve system stats');
+    }
+    const data = await response.json();
+    return data.stats;
+  },
+
   /** Upload audio file for speech-to-text transcription */
   async transcribe(
     file: File, 

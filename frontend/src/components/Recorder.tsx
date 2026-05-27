@@ -4,6 +4,81 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Square, Pause, Play, AlertCircle, Loader2 } from 'lucide-react';
 import { api, TranscriptRecord } from '@/lib/api';
 
+// Cybernetic synthesized Web Audio SFX Engine
+const playCyberSound = (type: 'click' | 'chime' | 'laser' | 'copilot') => {
+  if (typeof window === 'undefined') return;
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    if (type === 'click') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+      
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+      
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    } 
+    else if (type === 'copilot') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1800, audioCtx.currentTime + 0.04);
+      
+      gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+      
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.08);
+    }
+    else if (type === 'laser') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      osc.frequency.linearRampToValueAtTime(150, audioCtx.currentTime + 0.18);
+      
+      gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+      
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.18);
+    } 
+    else if (type === 'chime') {
+      const now = audioCtx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+        
+        gain.gain.setValueAtTime(0.0, now);
+        gain.gain.linearRampToValueAtTime(0.05, now + idx * 0.06 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.3);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + idx * 0.06);
+        osc.stop(now + idx * 0.06 + 0.3);
+      });
+    }
+  } catch (e) {
+    console.warn("Audio Context sound effect failed:", e);
+  }
+};
+
 // Native browser SpeechRecognition declaration helper
 const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
@@ -65,6 +140,7 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
     setError(null);
     audioChunksRef.current = [];
     setLiveTranscript('');
+    playCyberSound('laser');
     
     try {
       // 1. Request microphone access
@@ -237,6 +313,7 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
       // Trigger server REST transcription
       const record = await api.transcribe(file, engine, key, language);
       onTranscriptionComplete(record);
+      playCyberSound('chime');
       setLiveTranscript(''); // clear live stream tray upon success
       
     } catch (err: any) {

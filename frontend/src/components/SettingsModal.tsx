@@ -1,11 +1,27 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Key, Shield, Settings, Sliders, Volume2, Sparkles } from 'lucide-react';
+import { 
+  X, Key, Settings, Sliders, Volume2, Sparkles, 
+  Database, HardDrive, CheckCircle2, AlertTriangle, Cpu, Palette 
+} from 'lucide-react';
+import { api } from '@/lib/api';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface SystemStats {
+  total_logs: number;
+  pruned_logs: number;
+  active_audio_logs: number;
+  total_duration: number;
+  audio_size_mb: number;
+  db_size_kb: number;
+  ffmpeg_installed: boolean;
+  max_storage_mb: number;
+  max_files: number;
 }
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
@@ -15,6 +31,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [aiKey, setAiKey] = useState('');
   const [language, setLanguage] = useState('en-US');
   const [visualizerStyle, setVisualizerStyle] = useState('sine');
+  const [theme, setTheme] = useState('aura-dark');
+  
+  // Stats state
+  const [stats, setStats] = useState<SystemStats | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   // Load preferences from localStorage on mount
   useEffect(() => {
@@ -25,8 +46,25 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setAiKey(localStorage.getItem('aiKey') || '');
       setLanguage(localStorage.getItem('language') || 'en-US');
       setVisualizerStyle(localStorage.getItem('visualizerStyle') || 'sine');
+      setTheme(localStorage.getItem('theme') || 'aura-dark');
+    }
+
+    if (isOpen) {
+      fetchStats();
     }
   }, [isOpen]);
+
+  const fetchStats = async () => {
+    setIsLoadingStats(true);
+    try {
+      const data = await api.getStats();
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to load server stats:", err);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
 
   const handleSave = () => {
     localStorage.setItem('sttEngine', sttEngine);
@@ -35,6 +73,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     localStorage.setItem('aiKey', aiKey);
     localStorage.setItem('language', language);
     localStorage.setItem('visualizerStyle', visualizerStyle);
+    localStorage.setItem('theme', theme);
     
     // Dispatch custom event to notify other components of preference updates
     window.dispatchEvent(new Event('settings-updated'));
@@ -42,6 +81,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
 
   if (!isOpen) return null;
+
+  // Calculate storage usage percentage
+  const storagePercent = stats ? Math.min(100, (stats.audio_size_mb / stats.max_storage_mb) * 100) : 0;
+  const filesPercent = stats ? Math.min(100, (stats.active_audio_logs / stats.max_files) * 100) : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -58,7 +101,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
           <button 
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+            className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -82,7 +125,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <button
                   key={engine.id}
                   onClick={() => setSttEngine(engine.id)}
-                  className={`py-2.5 px-3 rounded-lg text-xs font-medium border transition-all text-center ${
+                  className={`py-2.5 px-3 rounded-lg text-xs font-medium border transition-all text-center cursor-pointer ${
                     sttEngine === engine.id
                       ? 'border-violet-500 bg-violet-500/10 text-white shadow-[0_0_10px_0_rgba(139,92,246,0.2)]'
                       : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/20 hover:bg-white/10 hover:text-white'
@@ -125,7 +168,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <button
                   key={prov.id}
                   onClick={() => setAiProvider(prov.id)}
-                  className={`py-2.5 px-3 rounded-lg text-xs font-medium border transition-all text-center ${
+                  className={`py-2.5 px-3 rounded-lg text-xs font-medium border transition-all text-center cursor-pointer ${
                     aiProvider === prov.id
                       ? 'border-pink-500 bg-pink-500/10 text-white shadow-[0_0_10px_0_rgba(236,72,153,0.15)]'
                       : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/20 hover:bg-white/10 hover:text-white'
@@ -154,20 +197,20 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
           </div>
 
-          {/* Section 3: Speech Language */}
+          {/* Section 3: Language & Visuals */}
           <div className="space-y-3 pt-3 border-t border-white/5">
             <h3 className="text-sm font-semibold tracking-wider text-violet-400 flex items-center space-x-1.5 uppercase">
               <Sliders className="w-4 h-4" />
-              <span>Language & Visuals</span>
+              <span>Language, Visuals & Theme</span>
             </h3>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 col-span-2 sm:col-span-1">
                 <label className="text-xs text-gray-300">Spoken Language</label>
                 <select
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
-                  className="w-full py-2 px-2 text-sm bg-black/40 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-white transition-colors [&>option]:bg-[#12101f] [&>option]:text-white"
+                  className="w-full py-2 px-2 text-sm bg-black/40 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-white transition-colors [&>option]:bg-[#12101f] [&>option]:text-white cursor-pointer"
                 >
                   <option value="en-US">English (US)</option>
                   <option value="es-ES">Spanish (Spain)</option>
@@ -180,12 +223,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </select>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 col-span-2 sm:col-span-1">
                 <label className="text-xs text-gray-300">Audio Visualizer</label>
                 <select
                   value={visualizerStyle}
                   onChange={(e) => setVisualizerStyle(e.target.value)}
-                  className="w-full py-2 px-2 text-sm bg-black/40 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-white transition-colors [&>option]:bg-[#12101f] [&>option]:text-white"
+                  className="w-full py-2 px-2 text-sm bg-black/40 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-white transition-colors [&>option]:bg-[#12101f] [&>option]:text-white cursor-pointer"
                 >
                   <option value="sine">Cyber Sine Wave</option>
                   <option value="bars">Neon Frequency Bars</option>
@@ -194,7 +237,113 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <option value="3d-particle-orbit">3D Cyber Orbit Sphere</option>
                 </select>
               </div>
+
+              <div className="space-y-1.5 col-span-2">
+                <label className="text-xs text-gray-300 flex items-center space-x-1.5">
+                  <Palette className="w-3.5 h-3.5 text-violet-400" />
+                  <span>Color Aesthetic Style</span>
+                </label>
+                <select
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value)}
+                  className="w-full py-2 px-2 text-sm bg-black/40 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-white transition-colors [&>option]:bg-[#12101f] [&>option]:text-white cursor-pointer"
+                >
+                  <option value="aura-dark">🔮 Aura Dark (Space Violet & Magenta)</option>
+                  <option value="matrix-cyber">🟢 Matrix Cyber (Retro Terminal Green)</option>
+                  <option value="oceanic-glow">🔵 Oceanic Glow (Cyberpunk Cobalt & Cyan)</option>
+                  <option value="volcanic-core">🌋 Volcanic Core (Dark Magma & Orange)</option>
+                </select>
+              </div>
             </div>
+          </div>
+
+          {/* Section 4: System Storage & Diagnostics Dashboard */}
+          <div className="space-y-3 pt-3 border-t border-white/5">
+            <h3 className="text-sm font-semibold tracking-wider text-violet-400 flex items-center space-x-1.5 uppercase">
+              <Database className="w-4 h-4" />
+              <span>Storage & Diagnostics Panel</span>
+            </h3>
+
+            {isLoadingStats ? (
+              <div className="flex items-center justify-center space-x-2 py-4 text-xs text-gray-500">
+                <div className="w-4 h-4 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
+                <span>Interrogating hardware...</span>
+              </div>
+            ) : stats ? (
+              <div className="space-y-3.5 bg-black/30 border border-white/5 rounded-xl p-3.5 shadow-inner">
+                {/* Visual storage indicators */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Space MB */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-gray-400">
+                      <span className="flex items-center space-x-1">
+                        <HardDrive className="w-3 h-3 text-violet-400" />
+                        <span>Disk Overhead</span>
+                      </span>
+                      <span className="font-semibold text-white">{stats.audio_size_mb.toFixed(2)} MB / {stats.max_storage_mb}.0 MB</span>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className="bg-gradient-to-r from-violet-500 to-pink-500 h-full transition-all duration-500"
+                        style={{ width: `${storagePercent}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Active Files Count */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-gray-400">
+                      <span className="flex items-center space-x-1">
+                        <Database className="w-3 h-3 text-pink-400" />
+                        <span>LRU Audio Active</span>
+                      </span>
+                      <span className="font-semibold text-white">{stats.active_audio_logs} / {stats.max_files} WAVs</span>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className="bg-gradient-to-r from-pink-500 to-violet-500 h-full transition-all duration-500"
+                        style={{ width: `${filesPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subtext info */}
+                <div className="grid grid-cols-2 gap-2 border-t border-white/5 pt-2.5 text-[10px] text-gray-500 font-medium">
+                  <div>
+                    Database ledger: <strong className="text-gray-300 font-semibold">{stats.db_size_kb.toFixed(1)} KB</strong>
+                  </div>
+                  <div>
+                    Pruned files: <strong className="text-gray-300 font-semibold">{stats.pruned_logs} recordings</strong>
+                  </div>
+                  
+                  {/* FFmpeg Badge */}
+                  <div className="col-span-2 flex items-center justify-between border-t border-white/5 pt-2 mt-1">
+                    <span className="flex items-center space-x-1">
+                      <Cpu className="w-3.5 h-3.5 text-violet-400" />
+                      <span>Audio Compression (FFmpeg)</span>
+                    </span>
+                    {stats.ffmpeg_installed ? (
+                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        <span>Enabled</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-bold" title="Audio scales to pure PCM WAV files. FFmpeg fallback active.">
+                        <AlertTriangle className="w-2.5 h-2.5 animate-pulse" />
+                        <span>WAV Fallback</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-[10px] text-gray-500 py-2">
+                Failed to interrogate diagnostics dashboard.
+              </div>
+            )}
           </div>
         </div>
 
@@ -202,13 +351,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-white/10">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold btn-neon-secondary rounded-lg"
+            className="px-4 py-2 text-xs font-semibold btn-neon-secondary rounded-lg cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-5 py-2 text-xs font-semibold btn-neon-primary rounded-lg"
+            className="px-5 py-2 text-xs font-semibold btn-neon-primary rounded-lg cursor-pointer"
           >
             Apply Preferences
           </button>

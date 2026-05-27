@@ -16,6 +16,102 @@ interface TranscriptViewerProps {
 
 type TabType = 'original' | 'summary' | 'action_items' | 'translation' | 'polished' | 'copilot';
 
+// Heuristics Tone Analyzer
+const getToneDetails = (text: string) => {
+  const t = (text || '').toLowerCase();
+  if (t.includes('urgent') || t.includes('immediately') || t.includes('asap') || t.includes('must') || t.includes('critical')) {
+    return { label: 'Urgent 🚨', color: 'bg-rose-500/10 border-rose-500/20 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.08)]' };
+  }
+  if (t.includes('excited') || t.includes('great') || t.includes('awesome') || t.includes('launch') || t.includes('cool')) {
+    return { label: 'Energetic ⚡', color: 'bg-amber-500/10 border-amber-500/20 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.08)]' };
+  }
+  if (t.includes('problem') || t.includes('fail') || t.includes('bug') || t.includes('error') || t.includes('issue')) {
+    return { label: 'Concerned 😰', color: 'bg-pink-500/10 border-pink-500/20 text-pink-400 shadow-[0_0_8px_rgba(236,72,153,0.08)]' };
+  }
+  if (t.includes('research') || t.includes('study') || t.includes('analyze') || t.includes('calculate') || t.includes('formula')) {
+    return { label: 'Academic 🎓', color: 'bg-blue-500/10 border-blue-500/20 text-blue-400 shadow-[0_0_8px_rgba(14,165,233,0.08)]' };
+  }
+  if (t.includes('creative') || t.includes('design') || t.includes('ideas') || t.includes('concept') || t.includes('brainstorm')) {
+    return { label: 'Creative 💡', color: 'bg-violet-500/10 border-violet-500/20 text-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.08)]' };
+  }
+  return { label: 'Professional 💼', color: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.08)]' };
+};
+
+// Cybernetic synthesized Web Audio SFX Engine
+const playCyberSound = (type: 'click' | 'chime' | 'laser' | 'copilot') => {
+  if (typeof window === 'undefined') return;
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    if (type === 'click') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+      
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+      
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    } 
+    else if (type === 'copilot') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1800, audioCtx.currentTime + 0.04);
+      
+      gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+      
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.08);
+    }
+    else if (type === 'laser') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      osc.frequency.linearRampToValueAtTime(150, audioCtx.currentTime + 0.18);
+      
+      gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+      
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.18);
+    } 
+    else if (type === 'chime') {
+      const now = audioCtx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+        
+        gain.gain.setValueAtTime(0.0, now);
+        gain.gain.linearRampToValueAtTime(0.05, now + idx * 0.06 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.3);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + idx * 0.06);
+        osc.stop(now + idx * 0.06 + 0.3);
+      });
+    }
+  } catch (e) {
+    console.warn("Audio Context sound effect failed:", e);
+  }
+};
+
 export default function TranscriptViewer({ record, onUpdate, onDelete }: TranscriptViewerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('original');
   const [editedText, setEditedText] = useState('');
@@ -89,6 +185,7 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
   const handleAIAnalyze = async (action: 'summarize' | 'action_items' | 'translate' | 'fix_grammar') => {
     setLoadingAction(action);
     setAiError(null);
+    playCyberSound('laser');
     try {
       const provider = (localStorage.getItem('aiProvider') as 'gemini' | 'deepinfra') || 'gemini';
       const apiKey = localStorage.getItem('aiKey') || '';
@@ -103,6 +200,7 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
       });
 
       onUpdate(res.transcript);
+      playCyberSound('chime');
       
       // Auto switch tabs
       if (action === 'summarize') setActiveTab('summary');
@@ -154,6 +252,7 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
         ...prev,
         [record.id]: [...updatedThread, assistantMsg]
       }));
+      playCyberSound('copilot');
     } catch (err: any) {
       console.error(err);
       const errMsg = { role: 'assistant' as const, content: `⚠️ **Error:** ${err.message || 'Failed to connect to Copilot.'}` };
@@ -220,12 +319,16 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
             className="w-full text-lg font-bold bg-transparent border-b border-transparent hover:border-white/15 focus:border-violet-500 focus:outline-none text-white focus:ring-0 transition-colors print:text-black print:font-extrabold"
             placeholder="Untitled Transcription"
           />
-          <div className="flex items-center space-x-3 text-xs text-gray-400 print:text-black">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-400 print:text-black">
             <span>{new Date(record.created_at).toLocaleString()}</span>
             <span>•</span>
             <span>{record.duration.toFixed(1)}s Duration</span>
             <span>•</span>
             <span className="capitalize">{record.language}</span>
+            <span>•</span>
+            <span className={`px-2 py-0.5 rounded border text-[9px] font-bold ${getToneDetails(record.text).color}`}>
+              {getToneDetails(record.text).label}
+            </span>
           </div>
         </div>
         
@@ -263,7 +366,7 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as TabType)}
+              onClick={() => { playCyberSound('click'); setActiveTab(tab.id as TabType); }}
               className={`flex items-center space-x-2 py-2.5 px-4 text-xs font-semibold rounded-lg transition-all flex-shrink-0 cursor-pointer ${
                 isActive
                   ? 'bg-gradient-to-b from-[#1c1635] to-[#0d0b1a] border border-violet-500/30 text-white shadow-[0_4px_12px_-2px_rgba(139,92,246,0.25),_inset_0_1px_1px_rgba(255,255,255,0.08)] transform translate-y-[0px]'
