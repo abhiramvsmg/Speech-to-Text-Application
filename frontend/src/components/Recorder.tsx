@@ -95,11 +95,18 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
   const [isUploading, setIsUploading] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  // Recording References
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
+
+  // WAV Capturing Audio Graph References
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const processorNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const audioInputRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const pcmBuffersRef = useRef<Float32Array[]>([]);
+  const pcmLengthRef = useRef<number>(0);
+  const isPausedRef = useRef(false);
 
   // Clean up recording stream, timer, and recognition on unmount
   useEffect(() => {
@@ -138,7 +145,6 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
 
   const startRecording = async () => {
     setError(null);
-    audioChunksRef.current = [];
     setLiveTranscript('');
     playCyberSound('laser');
     
@@ -148,31 +154,35 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
       streamRef.current = stream;
       onStreamChange(stream);
 
-      // Determine ideal mimeType for browser recordings
-      let options = { mimeType: 'audio/webm' };
-      if (!MediaRecorder.isTypeSupported('audio/webm')) {
-        options = { mimeType: 'audio/ogg' };
-      }
-      if (!MediaRecorder.isTypeSupported('audio/ogg')) {
-        // Fallback to default
-        (options as any) = undefined;
-      }
+      // 2. Initialize AudioContext and ScriptProcessor for direct 16-bit PCM WAV encoding
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass();
+      audioContextRef.current = audioCtx;
 
-      // 2. Initialize MediaRecorder
-      const mediaRecorder = new MediaRecorder(stream, options);
-      mediaRecorderRef.current = mediaRecorder;
+      const sampleRate = audioCtx.sampleRate;
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+      // bufferSize = 4096, 1 input channel, 1 output channel
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      processorNodeRef.current = processor;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      audioInputRef.current = source;
+
+      // Reset buffers
+      pcmBuffersRef.current = [];
+      pcmLengthRef.current = 0;
+      isPausedRef.current = false;
+
+      processor.onaudioprocess = (e) => {
+        if (isPausedRef.current) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        // Clone raw float PCM data to avoid garbage collection recycling
+        pcmBuffersRef.current.push(new Float32Array(inputData));
+        pcmLengthRef.current += inputData.length;
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
-        cleanupStream();
-        await uploadAudio(audioBlob);
-      };
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
 
       // 3. Initialize native interim SpeechRecognition for zero-latency feedback
       if (SpeechRecognition) {
@@ -210,7 +220,6 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
         }
       }
 
-      mediaRecorder.start(250); // Collect data every 250ms for chunk efficiency
       setIsRecording(true);
       setIsPaused(false);
       setDuration(0);
@@ -227,8 +236,8 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
   };
 
   const pauseRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.pause();
+    if (isRecording) {
+      isPausedRef.current = true;
       setIsPaused(true);
       stopTimer();
 
@@ -242,8 +251,8 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
   };
 
   const resumeRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.resume();
+    if (isRecording) {
+      isPausedRef.current = false;
       setIsPaused(false);
       startTimer();
 
@@ -280,10 +289,10 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+    if (isRecording) {
       setIsRecording(false);
       setIsPaused(false);
+      isPausedRef.current = false;
       stopTimer();
 
       // Terminate live speech recognition
@@ -293,6 +302,37 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
         } catch (e) {}
         recognitionRef.current = null;
       }
+
+      // Collect data before closing the audio graph
+      const buffers = pcmBuffersRef.current;
+      const totalLength = pcmLengthRef.current;
+      const sampleRate = audioContextRef.current ? audioContextRef.current.sampleRate : 44100;
+
+      // Disconnect and clean up nodes
+      if (processorNodeRef.current) {
+        try {
+          processorNodeRef.current.disconnect();
+        } catch (e) {}
+        processorNodeRef.current = null;
+      }
+      if (audioInputRef.current) {
+        try {
+          audioInputRef.current.disconnect();
+        } catch (e) {}
+        audioInputRef.current = null;
+      }
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close();
+        } catch (e) {}
+        audioContextRef.current = null;
+      }
+
+      cleanupStream();
+
+      // Encode captured PCM float arrays into a high-fidelity 16-bit Mono WAV blob
+      const wavBlob = encodeWAV(buffers, totalLength, sampleRate);
+      uploadAudio(wavBlob);
     }
   };
 
@@ -306,9 +346,8 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
       const key = localStorage.getItem('sttKey') || '';
       const language = localStorage.getItem('language') || 'en-US';
 
-      // Convert blob into file payload
-      const extension = blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'wav';
-      const file = new File([blob], `mic_voice.${extension}`, { type: blob.type });
+      // Convert blob into file payload - since we encode as WAV in client, it's always WAV!
+      const file = new File([blob], `mic_voice.wav`, { type: 'audio/wav' });
 
       // Trigger server REST transcription
       const record = await api.transcribe(file, engine, key, language);
@@ -450,3 +489,59 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
     </div>
   );
 }
+
+// ----------------------------------------------------
+// 16-BIT PCM MONO WAV CLIENT-SIDE ENCODER UTILITIES
+// ----------------------------------------------------
+const encodeWAV = (buffers: Float32Array[], totalLength: number, sampleRate: number): Blob => {
+  const buffer = new ArrayBuffer(44 + totalLength * 2);
+  const view = new DataView(buffer);
+
+  /* RIFF identifier */
+  writeString(view, 0, 'RIFF');
+  /* file length */
+  view.setUint32(4, 36 + totalLength * 2, true);
+  /* RIFF type */
+  writeString(view, 8, 'WAVE');
+  /* format chunk identifier */
+  writeString(view, 12, 'fmt ');
+  /* format chunk length */
+  view.setUint32(16, 16, true);
+  /* sample format (raw PCM) */
+  view.setUint16(20, 1, true);
+  /* channel count (mono) */
+  view.setUint16(22, 1, true);
+  /* sample rate */
+  view.setUint32(24, sampleRate, true);
+  /* byte rate (sample rate * block align) */
+  view.setUint32(28, sampleRate * 2, true);
+  /* block align (channel count * bytes per sample) */
+  view.setUint16(32, 2, true);
+  /* bits per sample (16-bit PCM) */
+  view.setUint16(34, 16, true);
+  /* data chunk identifier */
+  writeString(view, 36, 'data');
+  /* data chunk length */
+  view.setUint32(40, totalLength * 2, true);
+
+  // Write float samples converted to 16-bit integers
+  let offset = 44;
+  for (let i = 0; i < buffers.length; i++) {
+    const buffer = buffers[i];
+    for (let j = 0; j < buffer.length; j++) {
+      // Clamp float sample between -1.0 and 1.0
+      const sample = Math.max(-1, Math.min(1, buffer[j]));
+      // Convert to 16-bit signed integer PCM
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+
+  return new Blob([view], { type: 'audio/wav' });
+};
+
+const writeString = (view: DataView, offset: number, string: string) => {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+};
