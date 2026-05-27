@@ -169,6 +169,15 @@ def update_transcript(transcript_id, title=None, text=None, summary=None, action
     
     return get_transcript(transcript_id)
 
+def clear_transcript_audio(transcript_id):
+    """Sets the audio_filename of a transcript to NULL, indicating it has been pruned."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE transcripts SET audio_filename = NULL WHERE id = ?', (transcript_id,))
+    conn.commit()
+    conn.close()
+    return get_transcript(transcript_id)
+
 def delete_transcript(transcript_id):
     """Deletes a transcript by ID and returns its audio filename if present."""
     transcript = get_transcript(transcript_id)

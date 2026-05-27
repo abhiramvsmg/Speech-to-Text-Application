@@ -102,7 +102,7 @@ class AIService:
         res_json = response.json()
         try:
             return res_json['candidates'][0]['content']['parts'][0]['text']
-        except (KeyError, IndexOffBounds) as e:
+        except (KeyError, IndexError) as e:
             raise Exception(f"Gemini response structure unexpected: {res_json}")
 
     @staticmethod
@@ -127,7 +127,7 @@ class AIService:
         res_json = response.json()
         try:
             return res_json['choices'][0]['message']['content']
-        except (KeyError, IndexOutOfBounds) as e:
+        except (KeyError, IndexError) as e:
             raise Exception(f"DeepInfra response structure unexpected: {res_json}")
 
     @staticmethod

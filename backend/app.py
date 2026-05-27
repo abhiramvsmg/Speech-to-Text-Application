@@ -22,6 +22,13 @@ CORS(app)
 # Initialize database schema
 init_db()
 
+# Auto-prune database uploads folder on startup to avoid storage stress
+try:
+    from services.storage_service import StorageService
+    StorageService.prune_uploads(max_size_mb=30, max_files=10)
+except Exception as startup_prune_err:
+    print(f"[App] Startup storage pruning error: {startup_prune_err}")
+
 @app.route('/api/health', methods=['GET'])
 def health():
     """Verify that backend server is alive and responding."""
@@ -106,6 +113,13 @@ def transcribe():
             user_id=user_id
         )
         
+        # Auto-prune old audio files to prevent storage bloat and reduce storage stress
+        try:
+            from services.storage_service import StorageService
+            StorageService.prune_uploads(max_size_mb=30, max_files=10)
+        except Exception as prune_err:
+            print(f"[App] Non-blocking storage pruning error: {prune_err}")
+            
         return jsonify({
             "status": "success",
             "transcript": record
