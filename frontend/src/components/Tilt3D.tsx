@@ -49,15 +49,15 @@ export default function Tilt3D({ children, className = '', intensity = 6 }: Tilt
     const rotateY = xc * intensity;
 
     // Direct hardware-accelerated transform style
-    setTransformStyle(`perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.015, 1.015, 1.015)`);
+    setTransformStyle(`perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`);
 
-    // Reflective glare shine gradient following cursor vectors
+    // Reflective glare shine gradient following cursor vectors (Theme-adaptive neon colors)
     const glx = (x / rect.width) * 100;
     const gly = (y / rect.height) * 100;
 
     setGlareStyle({
       opacity: 1,
-      background: `radial-gradient(circle at ${glx}% ${gly}%, rgba(255, 255, 255, 0.12) 0%, transparent 55%)`,
+      background: `radial-gradient(circle at ${glx}% ${gly}%, color-mix(in srgb, var(--glow-primary) 22%, transparent) 0%, color-mix(in srgb, var(--glow-secondary) 6%, transparent) 30%, transparent 65%)`,
     });
   };
 

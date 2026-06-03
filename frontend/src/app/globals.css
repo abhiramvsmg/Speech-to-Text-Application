@@ -55,6 +55,112 @@
   --glow-success: #10b981;
 }
 
+[data-theme="holographic-light"] {
+  --background: #f5f4fa;
+  --foreground: #1c1926;
+  --card-bg: rgba(255, 255, 255, 0.65);
+  --border-glow: rgba(124, 58, 237, 0.12);
+  --glow-primary: #7c3aed;
+  --glow-secondary: #db2777;
+  --glow-tertiary: #2563eb;
+  --glow-success: #059669;
+}
+
+/* --- Holographic Light overrides --- */
+[data-theme="holographic-light"]::before {
+  background-image: 
+    linear-gradient(rgba(124, 58, 237, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.04) 1px, transparent 1px);
+}
+
+[data-theme="holographic-light"]::after {
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(124, 58, 237, 0.07) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(219, 39, 119, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.05) 0%, transparent 50%);
+}
+
+[data-theme="holographic-light"] .glass-panel {
+  border: 1px solid rgba(124, 58, 237, 0.12);
+  box-shadow: 
+    0 8px 32px 0 rgba(124, 58, 237, 0.06),
+    0 4px 12px 0 rgba(0, 0, 0, 0.03),
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="holographic-light"] .glass-panel-hover:hover {
+  border-color: rgba(124, 58, 237, 0.35);
+  box-shadow: 
+    0 12px 40px 0 rgba(124, 58, 237, 0.1),
+    0 0 15px 1px rgba(124, 58, 237, 0.04),
+    inset 0 1px 2px 0 rgba(255, 255, 255, 1);
+}
+
+[data-theme="holographic-light"] .text-gray-300 {
+  color: #3b374d;
+}
+
+[data-theme="holographic-light"] .text-gray-400 {
+  color: #55506c;
+}
+
+[data-theme="holographic-light"] .text-gray-500 {
+  color: #726c8b;
+}
+
+[data-theme="holographic-light"] .text-gray-600 {
+  color: #8c86a5;
+}
+
+[data-theme="holographic-light"] .text-white {
+  color: #120f1e;
+}
+
+[data-theme="holographic-light"] input,
+[data-theme="holographic-light"] select,
+[data-theme="holographic-light"] textarea {
+  color: #1c1926 !important;
+}
+
+[data-theme="holographic-light"] .bg-black\/40 {
+  background-color: rgba(255, 255, 255, 0.45);
+}
+
+[data-theme="holographic-light"] .bg-white\/5 {
+  background-color: rgba(139, 92, 246, 0.05);
+}
+
+[data-theme="holographic-light"] .bg-white\/\[0\.01\] {
+  background-color: rgba(139, 92, 246, 0.02);
+}
+
+[data-theme="holographic-light"] .bg-white\/\[0\.02\] {
+  background-color: rgba(139, 92, 246, 0.04);
+}
+
+[data-theme="holographic-light"] .border-white\/5 {
+  border-color: rgba(139, 92, 246, 0.08);
+}
+
+[data-theme="holographic-light"] .border-white\/10 {
+  border-color: rgba(139, 92, 246, 0.15);
+}
+
+[data-theme="holographic-light"] .btn-neon-secondary {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  color: #4b23b5;
+}
+
+[data-theme="holographic-light"] .btn-neon-secondary:hover {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.45);
+}
+
+[data-theme="holographic-light"] .prose-invert {
+  color: #3b374d;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

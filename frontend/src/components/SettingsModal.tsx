@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   X, Key, Settings, Sliders, Volume2, Sparkles, 
   Database, HardDrive, CheckCircle2, AlertTriangle, Cpu, Palette 
@@ -25,37 +25,19 @@ interface SystemStats {
 }
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const [sttEngine, setSttEngine] = useState('local');
-  const [sttKey, setSttKey] = useState('');
-  const [aiProvider, setAiProvider] = useState('gemini');
-  const [aiKey, setAiKey] = useState('');
-  const [language, setLanguage] = useState('en-US');
-  const [visualizerStyle, setVisualizerStyle] = useState('sine');
-  const [theme, setTheme] = useState('aura-dark');
+  const [sttEngine, setSttEngine] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('sttEngine') || 'local' : 'local'));
+  const [sttKey, setSttKey] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('sttKey') || '' : ''));
+  const [aiProvider, setAiProvider] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('aiProvider') || 'gemini' : 'gemini'));
+  const [aiKey, setAiKey] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('aiKey') || '' : ''));
+  const [language, setLanguage] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('language') || 'en-US' : 'en-US'));
+  const [visualizerStyle, setVisualizerStyle] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('visualizerStyle') || 'sine' : 'sine'));
+  const [theme, setTheme] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('theme') || 'aura-dark' : 'aura-dark'));
   
   // Stats state
   const [stats, setStats] = useState<SystemStats | null>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
-  // Load preferences from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setSttEngine(localStorage.getItem('sttEngine') || 'local');
-      setSttKey(localStorage.getItem('sttKey') || '');
-      setAiProvider(localStorage.getItem('aiProvider') || 'gemini');
-      setAiKey(localStorage.getItem('aiKey') || '');
-      setLanguage(localStorage.getItem('language') || 'en-US');
-      setVisualizerStyle(localStorage.getItem('visualizerStyle') || 'sine');
-      setTheme(localStorage.getItem('theme') || 'aura-dark');
-    }
-
-    if (isOpen) {
-      fetchStats();
-    }
-  }, [isOpen]);
-
-  const fetchStats = async () => {
-    setIsLoadingStats(true);
+  const fetchStats = useCallback(async () => {
     try {
       const data = await api.getStats();
       setStats(data);
@@ -64,7 +46,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     } finally {
       setIsLoadingStats(false);
     }
-  };
+  }, []);
+
+  // Fetch stats when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        fetchStats();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, fetchStats]);
 
   const handleSave = () => {
     localStorage.setItem('sttEngine', sttEngine);
@@ -100,6 +92,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <h2 className="text-xl font-bold tracking-tight text-white">System Engine Hub</h2>
           </div>
           <button 
+            id="settings-close-btn"
             onClick={onClose}
             className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
           >
@@ -124,6 +117,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               ].map((engine) => (
                 <button
                   key={engine.id}
+                  id={`stt-engine-${engine.id}-btn`}
                   onClick={() => setSttEngine(engine.id)}
                   className={`py-2.5 px-3 rounded-lg text-xs font-medium border transition-all text-center cursor-pointer ${
                     sttEngine === engine.id
@@ -144,6 +138,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </label>
                 <input
                   type="password"
+                  id="settings-stt-key-input"
                   value={sttKey}
                   onChange={(e) => setSttKey(e.target.value)}
                   placeholder={`Paste your secret ${sttEngine} token...`}
@@ -167,6 +162,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               ].map((prov) => (
                 <button
                   key={prov.id}
+                  id={`ai-provider-${prov.id}-btn`}
                   onClick={() => setAiProvider(prov.id)}
                   className={`py-2.5 px-3 rounded-lg text-xs font-medium border transition-all text-center cursor-pointer ${
                     aiProvider === prov.id
@@ -186,6 +182,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </label>
               <input
                 type="password"
+                id="settings-ai-key-input"
                 value={aiKey}
                 onChange={(e) => setAiKey(e.target.value)}
                 placeholder="Paste key to activate advanced analytics... (Optional)"
@@ -208,6 +205,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <div className="space-y-1.5 col-span-2 sm:col-span-1">
                 <label className="text-xs text-gray-300">Spoken Language</label>
                 <select
+                  id="settings-language-select"
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
                   className="w-full py-2 px-2 text-sm bg-black/40 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-white transition-colors [&>option]:bg-[#12101f] [&>option]:text-white cursor-pointer"
@@ -226,6 +224,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <div className="space-y-1.5 col-span-2 sm:col-span-1">
                 <label className="text-xs text-gray-300">Audio Visualizer</label>
                 <select
+                  id="settings-visualizer-select"
                   value={visualizerStyle}
                   onChange={(e) => setVisualizerStyle(e.target.value)}
                   className="w-full py-2 px-2 text-sm bg-black/40 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-white transition-colors [&>option]:bg-[#12101f] [&>option]:text-white cursor-pointer"
@@ -244,11 +243,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <span>Color Aesthetic Style</span>
                 </label>
                 <select
+                  id="settings-theme-select"
                   value={theme}
                   onChange={(e) => setTheme(e.target.value)}
                   className="w-full py-2 px-2 text-sm bg-black/40 border border-white/10 rounded-lg focus:outline-none focus:border-violet-500 text-white transition-colors [&>option]:bg-[#12101f] [&>option]:text-white cursor-pointer"
                 >
                   <option value="aura-dark">🔮 Aura Dark (Space Violet & Magenta)</option>
+                  <option value="holographic-light">💿 Holographic Light (Premium 3D Light Mode)</option>
                   <option value="matrix-cyber">🟢 Matrix Cyber (Retro Terminal Green)</option>
                   <option value="oceanic-glow">🔵 Oceanic Glow (Cyberpunk Cobalt & Cyan)</option>
                   <option value="volcanic-core">🌋 Volcanic Core (Dark Magma & Orange)</option>
@@ -350,12 +351,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         {/* Footer actions */}
         <div className="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-white/10">
           <button
+            id="settings-cancel-btn"
             onClick={onClose}
             className="px-4 py-2 text-xs font-semibold btn-neon-secondary rounded-lg cursor-pointer"
           >
             Cancel
           </button>
           <button
+            id="settings-apply-btn"
             onClick={handleSave}
             className="px-5 py-2 text-xs font-semibold btn-neon-primary rounded-lg cursor-pointer"
           >

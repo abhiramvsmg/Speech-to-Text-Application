@@ -48,7 +48,9 @@ def init_db():
             action_items TEXT,
             translation TEXT,
             audio_filename TEXT,
-            user_id TEXT
+            user_id TEXT,
+            sentiment_metrics TEXT,
+            semantic_tags TEXT
         )
     ''')
     
@@ -57,7 +59,20 @@ def init_db():
         cursor.execute("ALTER TABLE transcripts ADD COLUMN user_id TEXT")
         print("[Database] Dynamic migration: Added user_id column to transcripts table.")
     except sqlite3.OperationalError:
-        # Column already exists, safe to ignore
+        pass
+
+    # Self-healing migration: dynamically add sentiment_metrics column if missing
+    try:
+        cursor.execute("ALTER TABLE transcripts ADD COLUMN sentiment_metrics TEXT")
+        print("[Database] Dynamic migration: Added sentiment_metrics column.")
+    except sqlite3.OperationalError:
+        pass
+
+    # Self-healing migration: dynamically add semantic_tags column if missing
+    try:
+        cursor.execute("ALTER TABLE transcripts ADD COLUMN semantic_tags TEXT")
+        print("[Database] Dynamic migration: Added semantic_tags column.")
+    except sqlite3.OperationalError:
         pass
         
     # Create speed indexes for high-volume query vector indexing
@@ -68,7 +83,7 @@ def init_db():
     conn.close()
     print("Database initialized and speed-indexed successfully at:", DB_PATH)
 
-def save_transcript(title, text, duration, language, audio_filename=None, summary=None, action_items=None, translation=None, user_id=None):
+def save_transcript(title, text, duration, language, audio_filename=None, summary=None, action_items=None, translation=None, user_id=None, sentiment_metrics=None, semantic_tags=None):
     """Saves a new transcript to the database."""
     transcript_id = str(uuid.uuid4())
     created_at = datetime.utcnow().isoformat()
@@ -76,9 +91,9 @@ def save_transcript(title, text, duration, language, audio_filename=None, summar
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO transcripts (id, title, text, duration, created_at, language, summary, action_items, translation, audio_filename, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (transcript_id, title, text, duration, created_at, language, summary, action_items, translation, audio_filename, user_id))
+        INSERT INTO transcripts (id, title, text, duration, created_at, language, summary, action_items, translation, audio_filename, user_id, sentiment_metrics, semantic_tags)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (transcript_id, title, text, duration, created_at, language, summary, action_items, translation, audio_filename, user_id, sentiment_metrics, semantic_tags))
     
     conn.commit()
     conn.close()
@@ -132,7 +147,7 @@ def get_transcript(transcript_id):
         return dict(row)
     return None
 
-def update_transcript(transcript_id, title=None, text=None, summary=None, action_items=None, translation=None):
+def update_transcript(transcript_id, title=None, text=None, summary=None, action_items=None, translation=None, sentiment_metrics=None, semantic_tags=None):
     """Updates an existing transcript with new title, text, or AI attributes."""
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -155,6 +170,12 @@ def update_transcript(transcript_id, title=None, text=None, summary=None, action
     if translation is not None:
         fields.append("translation = ?")
         values.append(translation)
+    if sentiment_metrics is not None:
+        fields.append("sentiment_metrics = ?")
+        values.append(sentiment_metrics)
+    if semantic_tags is not None:
+        fields.append("semantic_tags = ?")
+        values.append(semantic_tags)
         
     if not fields:
         conn.close()

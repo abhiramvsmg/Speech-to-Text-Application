@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Settings, Sparkles, Database, Wifi, WifiOff, ShieldCheck, User } from 'lucide-react';
+import { Settings, Sparkles, Wifi, WifiOff, ShieldCheck, User } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface HeaderProps {
@@ -10,7 +10,12 @@ interface HeaderProps {
 
 export default function Header({ onOpenSettings }: HeaderProps) {
   const [isServerOnline, setIsServerOnline] = useState(false);
-  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('mockUser');
+    }
+    return null;
+  });
 
   // Poll backend health status
   useEffect(() => {
@@ -21,12 +26,6 @@ export default function Header({ onOpenSettings }: HeaderProps) {
 
     checkConnection();
     const interval = setInterval(checkConnection, 10000); // Check every 10s
-
-    // Set mock user on mount
-    if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('mockUser');
-      if (savedUser) setCurrentUser(savedUser);
-    }
 
     return () => clearInterval(interval);
   }, []);
@@ -86,6 +85,7 @@ export default function Header({ onOpenSettings }: HeaderProps) {
 
         {/* Multi-user mock profile trigger */}
         <button
+          id="header-profile-btn"
           onClick={handleToggleUser}
           className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg border text-xs transition-all ${
             currentUser
@@ -109,6 +109,7 @@ export default function Header({ onOpenSettings }: HeaderProps) {
 
         {/* Settings button */}
         <button
+          id="header-settings-btn"
           onClick={onOpenSettings}
           className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 border border-white/5 transition-all hover:scale-105"
           title="Adjust engines & keys"

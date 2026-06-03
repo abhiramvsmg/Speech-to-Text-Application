@@ -104,13 +104,26 @@ def transcribe():
         time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
         title = f"Voice Recording {time_str}"
         
+        # Extract dynamic tags and emotional sentiment metrics
+        import json
+        try:
+            metadata = AIService.extract_metadata(text, provider=stt_engine, api_key=stt_key)
+            sentiment_metrics = json.dumps(metadata.get("sentiment", {}))
+            semantic_tags = json.dumps(metadata.get("tags", []))
+        except Exception as meta_err:
+            print(f"[App] Non-blocking metadata extraction failure: {meta_err}")
+            sentiment_metrics = None
+            semantic_tags = None
+
         record = save_transcript(
             title=title,
             text=text,
             duration=duration,
             language=lang_code,
             audio_filename=target_filename,
-            user_id=user_id
+            user_id=user_id,
+            sentiment_metrics=sentiment_metrics,
+            semantic_tags=semantic_tags
         )
         
         # Auto-prune old audio files to prevent storage bloat and reduce storage stress
@@ -131,6 +144,63 @@ def transcribe():
         if os.path.exists(temp_path): os.remove(temp_path)
         if os.path.exists(target_path): os.remove(target_path)
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/transcripts', methods=['POST'])
+def save_raw_text_transcript():
+    """
+    Directly saves a raw text transcript (frontend-native SpeechRecognition fallback).
+    Accepts: JSON body with:
+      - 'title': Title of the voice note
+      - 'text': Raw text transcription
+      - 'duration': Real time duration
+      - 'language': Language code
+      - 'stt_engine': Provider (optional)
+      - 'stt_key': Key (optional)
+      - 'user_id': User scope (optional)
+    """
+    data = request.get_json() or {}
+    title = data.get('title')
+    text = data.get('text')
+    duration = data.get('duration', 0.0)
+    language = data.get('language', 'en-US')
+    stt_engine = data.get('stt_engine', 'local')
+    stt_key = data.get('stt_key')
+    user_id = data.get('user_id')
+    
+    if not text or not text.strip():
+        return jsonify({"error": "Missing required field: text"}), 400
+        
+    if not title:
+        from datetime import datetime
+        time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+        title = f"Voice Recording {time_str}"
+        
+    # Extract dynamic tags and emotional sentiment metrics
+    import json
+    try:
+        metadata = AIService.extract_metadata(text, provider=stt_engine, api_key=stt_key)
+        sentiment_metrics = json.dumps(metadata.get("sentiment", {}))
+        semantic_tags = json.dumps(metadata.get("tags", []))
+    except Exception as meta_err:
+        print(f"[App] Non-blocking metadata extraction failure: {meta_err}")
+        sentiment_metrics = None
+        semantic_tags = None
+
+    record = save_transcript(
+        title=title,
+        text=text,
+        duration=duration,
+        language=language,
+        audio_filename=None, # no audio file for text-only fallbacks
+        user_id=user_id,
+        sentiment_metrics=sentiment_metrics,
+        semantic_tags=semantic_tags
+    )
+    
+    return jsonify({
+        "status": "success",
+        "transcript": record
+    }), 201
 
 @app.route('/api/ai/analyze', methods=['POST'])
 def analyze_transcript():
@@ -242,6 +312,51 @@ def chat_copilot():
     except Exception as e:
         print(f"[App] AI Copilot chat endpoint error: {e}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/ai/chat/stream', methods=['POST'])
+def chat_copilot_stream():
+    """
+    Endpoint for streaming conversation with the AI Copilot.
+    Yields standard Server-Sent Events (SSE) data chunks.
+    Accepts: JSON body with:
+      - 'id': ID of the transcript
+      - 'messages': List of past messages e.g. [{"role": "user"|"assistant", "content": string}]
+      - 'provider': 'gemini' or 'deepinfra'
+      - 'api_key': client-provided API key
+    """
+    data = request.get_json() or {}
+    transcript_id = data.get('id')
+    messages = data.get('messages', [])
+    provider = data.get('provider', 'gemini')
+    api_key = data.get('api_key')
+    
+    if not transcript_id or not messages:
+        return jsonify({"error": "Missing required fields: id and messages"}), 400
+        
+    record = get_transcript(transcript_id)
+    if not record:
+        return jsonify({"error": "Transcript record not found"}), 404
+        
+    def generate_events():
+        try:
+            import json
+            for chunk in AIService.chat_stream(
+                text=record['text'],
+                messages=messages,
+                provider=provider,
+                api_key=api_key
+            ):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            print(f"[App] Streaming exception: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            
+    from flask import Response
+    return Response(generate_events(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no'
+    })
 
 @app.route('/api/stats', methods=['GET'])
 def get_system_stats():

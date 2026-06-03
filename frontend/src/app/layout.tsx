@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -6,7 +6,11 @@ export const metadata: Metadata = {
   description: "Convert spoken audio into written text in real-time. Features real-time neon spectrograms, persistent voice archives, and an elite suite of integrated AI assistant insights including summarization, translation, task checklist extraction, and tone adjustments.",
   keywords: ["speech-to-text", "voice transcriber", "AI translation", "audio spectrogram", "meeting transcript", "accessibility", "Flask STT", "Next.js AI"],
   authors: [{ name: "AURA Team" }],
-  viewport: "width=device-width, initial-scale=1",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

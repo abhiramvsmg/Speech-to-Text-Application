@@ -87,7 +87,7 @@ class AIService:
     @staticmethod
     def _call_gemini(prompt, api_key):
         """Calls Gemini API using standard HTTP REST interface."""
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
         headers = {"Content-Type": "application/json"}
         payload = {
             "contents": [{
@@ -104,6 +104,182 @@ class AIService:
             return res_json['candidates'][0]['content']['parts'][0]['text']
         except (KeyError, IndexError) as e:
             raise Exception(f"Gemini response structure unexpected: {res_json}")
+
+    @staticmethod
+    def extract_metadata(text, provider="gemini", api_key=None):
+        """
+        Extracts dynamic hashtags and emotional sentiment metrics from text.
+        Returns a dictionary:
+        {
+          "tags": ["#SprintPlanning", "#DesignAudit", ...],
+          "sentiment": {
+            "joy": 85,
+            "calm": 70,
+            "confident": 90,
+            "analytical": 60,
+            "urgent": 10
+          }
+        }
+        """
+        if not text or not text.strip():
+            return {
+                "tags": ["#Silent"],
+                "sentiment": {"joy": 50, "calm": 50, "confident": 50, "analytical": 50, "urgent": 50}
+            }
+            
+        print(f"[AIService] Extracting metadata (provider={provider})")
+        
+        # 1. Try Gemini
+        if provider == "gemini":
+            key = api_key or os.getenv("GEMINI_API_KEY")
+            if key:
+                prompt = (
+                    "Analyze the following speech transcript and return a strict JSON object with two fields:\n"
+                    "1. 'tags': A list of exactly 3-4 highly relevant, brief hashtag topics starting with '#' (e.g., ['#SprintPlanning', '#CreativeIdea']).\n"
+                    "2. 'sentiment': An object rating the speakers' emotional tones from 0 to 100 for these five variables: "
+                    "'joy', 'calm', 'confident', 'analytical', 'urgent'.\n\n"
+                    "Return ONLY valid raw JSON and absolutely nothing else. Do not use markdown code block wrappers or any prefix/suffix.\n\n"
+                    f"Transcript:\n\"{text}\""
+                )
+                try:
+                    res = AIService._call_gemini(prompt, key).strip()
+                    if res.startswith("```json"):
+                        res = res.replace("```json", "", 1)
+                    if res.endswith("```"):
+                        res = res.rsplit("```", 1)[0]
+                    res = res.strip()
+                    data = json.loads(res)
+                    if "tags" in data and "sentiment" in data:
+                        return data
+                except Exception as e:
+                    print(f"[AIService] Gemini metadata extraction error: {e}")
+                    
+        # 2. Heuristic fallback (fast, local, robust)
+        return AIService._heuristic_metadata(text)
+
+    @staticmethod
+    def _heuristic_metadata(text):
+        """Highly polished local rule-based emotional sentiment and hashtag classifier."""
+        t_lower = text.lower()
+        
+        # Keywords dictionaries for sentiment
+        triggers = {
+            "joy": ["excited", "great", "awesome", "happy", "cool", "love", "amazing", "perfect", "glad", "wonderful", "fun", "nice", "thrilled", "fantastic"],
+            "calm": ["peace", "relax", "easy", "okay", "steady", "calm", "slow", "fine", "neutral", "clear", "balance", "simple", "patience", "gentle"],
+            "confident": ["will", "certainly", "definitely", "absolutely", "guarantee", "sure", "confident", "know", "expert", "lead", "achieve", "resolve", "strong", "perfectly"],
+            "analytical": ["research", "study", "data", "percent", "metrics", "formula", "calculate", "prove", "test", "review", "system", "logic", "code", "structure", "analyze", "figure", "numbers"],
+            "urgent": ["urgent", "asap", "immediately", "critical", "danger", "must", "deadline", "now", "fast", "quick", "fail", "error", "stop", "warning", "instantly", "promptly"]
+        }
+        
+        # Default starting values
+        sentiment = {
+            "joy": 60,
+            "calm": 70,
+            "confident": 75,
+            "analytical": 60,
+            "urgent": 25
+        }
+        
+        # Scale scores up or down based on word counts
+        for emotion, keywords in triggers.items():
+            matches = sum(t_lower.count(k) for k in keywords)
+            if matches > 0:
+                sentiment[emotion] = min(98, sentiment[emotion] + matches * 8)
+                # Adjust opposite dimensions
+                if emotion == "urgent":
+                    sentiment["calm"] = max(20, sentiment["calm"] - matches * 8)
+                elif emotion == "calm":
+                    sentiment["urgent"] = max(15, sentiment["urgent"] - matches * 6)
+        
+        # Dynamic hashtag extraction based on matching context
+        tags = []
+        if any(k in t_lower for k in ["code", "build", "api", "database", "ui", "frontend", "backend", "next", "flask", "npm", "server"]):
+            tags.append("#DevEngineering")
+        if any(k in t_lower for k in ["design", "color", "style", "beautiful", "look", "art", "theme", "spectrogram", "radar"]):
+            tags.append("#CreativeAesthetic")
+        if any(k in t_lower for k in ["urgent", "asap", "must", "important", "deadline", "today", "immediately"]):
+            tags.append("#SprintSprint")
+        if any(k in t_lower for k in ["meeting", "agenda", "milestone", "roadmap", "strategy", "deliverable", "collaborate"]):
+            tags.append("#StrategySync")
+        
+        # Default tags if nothing matches
+        if not tags:
+            tags = ["#AuraSpectra", "#LinguisticInsights", "#VoiceLogs"]
+        else:
+            # Pad to 3 tags
+            if len(tags) < 3:
+                tags.append("#LinguisticInsights")
+            tags = tags[:4]
+            
+        return {
+            "tags": tags,
+            "sentiment": sentiment
+        }
+
+    @staticmethod
+    def chat_stream(text, messages, provider="gemini", api_key=None):
+        """
+        Generator that streams responses from conversational AI token-by-token.
+        Yields text chunks.
+        """
+        if not text or not text.strip():
+            yield "No transcription text context found to chat about."
+            return
+        if not messages:
+            yield "No chat history provided."
+            return
+
+        print(f"[AIService] Streaming chat (provider={provider})")
+
+        # 1. Format LLM prompt
+        prompt = AIService._get_chat_prompt(text, messages)
+
+        # 2. Try Gemini Streaming
+        if provider == "gemini":
+            key = api_key or os.getenv("GEMINI_API_KEY")
+            if key:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key={key}"
+                headers = {"Content-Type": "application/json"}
+                payload = {
+                    "contents": [{
+                        "parts": [{"text": prompt}]
+                    }]
+                }
+                try:
+                    response = requests.post(url, headers=headers, json=payload, stream=True, timeout=20)
+                    if response.status_code == 200:
+                        for line in response.iter_lines(decode_unicode=True):
+                            if line:
+                                cleaned = line.strip()
+                                if cleaned.startswith("["):
+                                    cleaned = cleaned[1:].strip()
+                                if cleaned.endswith("]"):
+                                    cleaned = cleaned[:-1].strip()
+                                if cleaned.startswith(","):
+                                    cleaned = cleaned[1:].strip()
+                                    
+                                if not cleaned:
+                                    continue
+                                    
+                                try:
+                                    data = json.loads(cleaned)
+                                    text_chunk = data['candidates'][0]['content']['parts'][0]['text']
+                                    yield text_chunk
+                                except Exception:
+                                    pass
+                        return
+                    else:
+                        print(f"[AIService] Gemini stream error code {response.status_code}: {response.text}")
+                except Exception as stream_err:
+                    print(f"[AIService] Gemini stream call exception: {stream_err}")
+
+        # 3. Heuristic streaming fallback (word by word typing effect)
+        fallback_res = AIService._heuristic_chat_fallback(text, messages)
+        import time
+        words = fallback_res.split(" ")
+        for i, w in enumerate(words):
+            yield w + (" " if i < len(words) - 1 else "")
+            time.sleep(0.015)
 
     @staticmethod
     def _call_deepinfra(prompt, api_key):
@@ -129,6 +305,48 @@ class AIService:
             return res_json['choices'][0]['message']['content']
         except (KeyError, IndexError) as e:
             raise Exception(f"DeepInfra response structure unexpected: {res_json}")
+
+    @staticmethod
+    def _free_google_translate(text, target_lang):
+        """
+        Translates text into the target language using Google's free translation endpoint.
+        Returns the translated text, or falls back to original text if error occurs.
+        """
+        lang_map = {
+            "Spanish": "es",
+            "French": "fr",
+            "German": "de",
+            "Japanese": "ja",
+            "Hindi": "hi",
+            "Chinese": "zh-CN",
+            "Arabic": "ar",
+            "Portuguese": "pt",
+            "English": "en"
+        }
+        lang_code = lang_map.get(target_lang, "en")
+        try:
+            url = "https://translate.googleapis.com/translate_a/single"
+            params = {
+                "client": "gtx",
+                "sl": "auto",
+                "tl": lang_code,
+                "dt": "t",
+                "q": text
+            }
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                res_json = response.json()
+                parts = []
+                for item in res_json[0]:
+                    if item[0]:
+                        parts.append(item[0])
+                translated_text = "".join(parts)
+                return translated_text
+            else:
+                print(f"[AIService] Free Google Translate returned status {response.status_code}")
+        except Exception as e:
+            print(f"[AIService] Free Google Translate failed: {e}")
+        return None
 
     @staticmethod
     def _heuristic_fallback(text, action, target_lang, tone):
@@ -222,22 +440,29 @@ class AIService:
             return markdown
             
         elif action == "translate":
-            # Provide a beautiful multi-lingual mock translation frame showing we did the work!
-            # Since standard translation requires full dictionary lookup, we provide a localized demo translation block.
-            lang_greetings = {
-                "Spanish": "Hola! He aquí una traducción simulada. Para obtener traducciones exactas en tiempo real, conecte una API de IA en la configuración.\n\nContenido traducido:\n",
-                "French": "Bonjour! Voici une simulation de traduction. Pour des traductions exactes en temps réel, veuillez connecter une API d'IA dans les paramètres.\n\nContenu traduit:\n",
-                "German": "Hallo! Dies ist eine simulierte Übersetzung. Für genaue Echtzeit-Übersetzungen verbinden Sie bitte eine KI-API in den Einstellungen.\n\nÜbersetzter Inhalt:\n",
-                "Japanese": "こんにちは！これはシミュレーション翻訳です。正確なリアルタイム翻訳を行うには、設定でAI APIキーを設定してください。\n\n翻訳内容:\n",
-                "Hindi": "नमस्ते! यह एक अनुवाद सिमुलेशन है। सटीक रीयल-टाइम अनुवाद के लिए, सेटिंग्स में एक AI API कुंजी कनेक्ट करें।\n\nअनुवादित सामग्री:\n",
-                "Chinese": "你好！这是一个模拟翻译。如需准确的实时翻译，请在设置中连接 AI API。\n\n翻译内容：\n",
-                "Arabic": "مرحباً! هذا محاكاة للترجمة. للحصول على ترجمة دقيقة في الوقت الفعلي، يرجى ربط مفتاح واجهة برمجة تطبيقات الذكاء الاصطناعي في الإعدادات.\n\nالمحتوى المترجم:\n",
-                "Portuguese": "Olá! Esta é uma tradução simulada. Para traduções exatas em tempo real, configure uma chave de API de IA nas configurações.\n\nConteúdo traduzido:\n"
-            }
-            greeting = lang_greetings.get(target_lang, f"Hello! [Translation to {target_lang} Fallback Mode]\n\n")
-            
-            # Formulate simple google translate-style frame
-            return f"### 🌐 AI Translation Hub ({target_lang})\n\n{greeting}*\"{text}\"*"
+            # Attempt to translate utilizing the free Google Translate service!
+            real_translation = AIService._free_google_translate(text, target_lang)
+            if real_translation:
+                return (
+                    f"### 🌐 AI Translation Hub ({target_lang})\n\n"
+                    f"**Translated Text:**\n"
+                    f"\"{real_translation}\"\n\n"
+                    f"---\n"
+                    f"*⚡ Powered by Google Translate (Zero-Key Heuristic Integration)*"
+                )
+            else:
+                lang_greetings = {
+                    "Spanish": "Hola! He aquí una traducción simulada. Para obtener traducciones exactas en tiempo real, conecte una API de IA en la configuración.\n\nContenido traducido:\n",
+                    "French": "Bonjour! Voici une simulation de traduction. Pour des traductions exactes en temps réel, veuillez connecter une API d'IA dans les paramètres.\n\nContenu traduit:\n",
+                    "German": "Hallo! Dies ist eine simulierte Übersetzung. Für genaue Echtzeit-Übersetzungen verbinden Sie bitte eine KI-API in den Einstellungen.\n\nÜbersetzter Inhalt:\n",
+                    "Japanese": "こんにちは！これはシミュレーション翻訳です。正確なリアルタイム翻訳を行うには、設定でAI APIキーを設定してください。\n\n翻訳内容:\n",
+                    "Hindi": "नमस्ते! यह एक अनुवाद सिमुलेशन है। सटीक रीयल-टाइम अनुवाद के लिए, सेटिंग्स में एक AI API कुंजी कनेक्ट करें।\n\nअनुवादित सामग्री:\n",
+                    "Chinese": "你好！这是一个模拟翻译。如需准确的实时翻译，请在设置中连接 AI API。\n\n翻译内容：\n",
+                    "Arabic": "مرحباً! هذا محاكاة للترجمة. للحصول على ترجمة دقيقة في الوقت الفعلي، يرجى ربط مفتاح واجهة برمجة تطبيقات الذكاء الاصطناعي في الإعدادات.\n\nالمحتوى المترجم:\n",
+                    "Portuguese": "Olá! Esta é uma tradução simulada. Para traduções exatas em tempo real, configure uma chave de API de IA nas configurações.\n\nConteúdo traduzido:\n"
+                }
+                greeting = lang_greetings.get(target_lang, f"Hello! [Translation to {target_lang} Fallback Mode]\n\n")
+                return f"### 🌐 AI Translation Hub ({target_lang})\n\n{greeting}*\"{text}\"*"
             
         elif action == "fix_grammar":
             # Perform heuristic adjustments: capitalize properly, remove typical spoken repetition

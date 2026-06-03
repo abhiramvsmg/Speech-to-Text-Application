@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  Search, Calendar, Clock, Sparkles, Trash2, 
+  Search, Calendar, Clock, Sparkles, 
   Play, Pause, FileCheck2, Volume2, Database, AlertCircle 
 } from 'lucide-react';
 import { api, TranscriptRecord } from '@/lib/api';
@@ -12,7 +12,7 @@ interface HistoryListProps {
   transcripts: TranscriptRecord[];
   selectedId: string | null;
   onSelect: (record: TranscriptRecord) => void;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
   onAudioPlayChange: (element: HTMLAudioElement | null, isPlaying: boolean) => void;
 }
 
@@ -27,21 +27,21 @@ export default function HistoryList({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Stop audio on unmount
-  useEffect(() => {
-    return () => {
-      stopAudio();
-    };
-  }, []);
-
-  const stopAudio = () => {
+  const stopAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
     setPlayingId(null);
     onAudioPlayChange(null, false);
-  };
+  }, [onAudioPlayChange]);
+
+  // Stop audio on unmount
+  useEffect(() => {
+    return () => {
+      stopAudio();
+    };
+  }, [stopAudio]);
 
   const handlePlayToggle = (e: React.MouseEvent, record: TranscriptRecord) => {
     e.stopPropagation(); // Avoid selecting the card
@@ -110,6 +110,7 @@ export default function HistoryList({
         <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
         <input
           type="text"
+          id="history-search-input"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search logs or keywords..."
@@ -150,6 +151,7 @@ export default function HistoryList({
           return (
             <Tilt3D key={item.id} intensity={4} className="w-full">
               <div
+                id={`history-item-${item.id}`}
                 onClick={() => onSelect(item)}
                 className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden group ${
                   isSelected
@@ -224,6 +226,7 @@ export default function HistoryList({
                   {/* Playback Trigger widget */}
                   {item.audio_filename && (
                     <button
+                      id={`history-play-btn-${item.id}`}
                       onClick={(e) => handlePlayToggle(e, item)}
                       className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all cursor-pointer ${
                         isPlaying 

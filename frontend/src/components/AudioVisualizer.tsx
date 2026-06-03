@@ -10,6 +10,18 @@ interface AudioVisualizerProps {
   isPlaying?: boolean;
 }
 
+interface Particle3D {
+  x: number;
+  y: number;
+  z: number;
+  baseX: number;
+  baseY: number;
+  baseZ: number;
+  color: string;
+  speed: number;
+  size: number;
+}
+
 export default function AudioVisualizer({
   stream,
   audioElement,
@@ -23,7 +35,7 @@ export default function AudioVisualizer({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | MediaElementAudioSourceNode | null>(null);
   const historyRef = useRef<number[][]>([]);
-  const particlesRef = useRef<any[]>([]);
+  const particlesRef = useRef<Particle3D[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -49,7 +61,7 @@ export default function AudioVisualizer({
     // Initialize 3D particles if empty
     if (particlesRef.current.length === 0) {
       const count = 120;
-      const pts = [];
+      const pts: Particle3D[] = [];
       for (let i = 0; i < count; i++) {
         const phi = Math.acos(-1 + (2 * i) / count);
         const theta = Math.sqrt(count * Math.PI) * phi;
@@ -76,7 +88,7 @@ export default function AudioVisualizer({
       if (sourceNodeRef.current) {
         try {
           sourceNodeRef.current.disconnect();
-        } catch (e) {
+        } catch {
           // ignore
         }
         sourceNodeRef.current = null;
@@ -94,7 +106,7 @@ export default function AudioVisualizer({
 
       try {
         if (!audioCtxRef.current) {
-          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          audioCtxRef.current = new (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
         }
         audioContext = audioCtxRef.current;
 

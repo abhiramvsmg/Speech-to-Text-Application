@@ -10,6 +10,7 @@ import TranscriptViewer from '@/components/TranscriptViewer';
 import HistoryList from '@/components/HistoryList';
 import Tilt3D from '@/components/Tilt3D';
 import { Volume2, Sparkles, History, HelpCircle } from 'lucide-react';
+import AmbientKineticBackground from '@/components/AmbientKineticBackground';
 
 export default function Page() {
   // Application Data States
@@ -21,11 +22,29 @@ export default function Page() {
   const [activeAudioElement, setActiveAudioElement] = useState<HTMLAudioElement | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [visualizerStyle, setVisualizerStyle] = useState('sine');
+  const [visualizerStyle, setVisualizerStyle] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('visualizerStyle') || 'sine';
+    }
+    return 'sine';
+  });
 
   // Interface Toggle States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+
+  const loadVisualizerPreference = () => {
+    if (typeof window !== 'undefined') {
+      setVisualizerStyle(localStorage.getItem('visualizerStyle') || 'sine');
+    }
+  };
+
+  const loadThemePreference = () => {
+    if (typeof window !== 'undefined') {
+      const theme = localStorage.getItem('theme') || 'aura-dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  };
 
   // 1. Initial Data Fetch & Preference Load
   useEffect(() => {
@@ -44,7 +63,6 @@ export default function Page() {
     };
 
     fetchHistory();
-    loadVisualizerPreference();
     loadThemePreference();
 
     // Listen for setting changes
@@ -58,19 +76,6 @@ export default function Page() {
       window.removeEventListener('settings-updated', handleSettingsUpdate);
     };
   }, []);
-
-  const loadVisualizerPreference = () => {
-    if (typeof window !== 'undefined') {
-      setVisualizerStyle(localStorage.getItem('visualizerStyle') || 'sine');
-    }
-  };
-
-  const loadThemePreference = () => {
-    if (typeof window !== 'undefined') {
-      const theme = localStorage.getItem('theme') || 'aura-dark';
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-  };
 
   // 2. Stream and Playback triggers
   const handleStreamChange = (stream: MediaStream | null) => {
@@ -109,7 +114,9 @@ export default function Page() {
   };
 
   return (
-    <main className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto flex flex-col space-y-6">
+    <>
+      <AmbientKineticBackground />
+      <main className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto flex flex-col space-y-6">
       
       {/* Navbar header section */}
       <Header onOpenSettings={() => setIsSettingsOpen(true)} />
@@ -118,16 +125,16 @@ export default function Page() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1">
         
         {/* Left Side: Wave visualizer + Recorder Control */}
-        <div className="lg:col-span-4 flex flex-col space-y-6 print:hidden">
+        <section className="lg:col-span-4 flex flex-col space-y-6 print:hidden">
           
           {/* Audio Visualizer Card */}
           <Tilt3D className="flex-1 flex flex-col min-h-[220px]">
             <div className="glass-panel border-white/5 p-4 flex flex-col h-full">
               <div className="flex items-center justify-between mb-3.5">
-                <h3 className="text-xs font-bold tracking-wider text-gray-400 uppercase flex items-center space-x-1.5">
+                <h2 className="text-xs font-bold tracking-wider text-gray-400 uppercase flex items-center space-x-1.5">
                   <Volume2 className="w-4 h-4 text-violet-400" />
                   <span>Audio Spectrogram</span>
-                </h3>
+                </h2>
                 <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded text-gray-400 capitalize">
                   {visualizerStyle === 'sine' ? 'Sine' : visualizerStyle === 'bars' ? 'Frequency' : visualizerStyle === 'circle' ? 'Pulsing Ring' : '3D Spectrogram'}
                 </span>
@@ -149,20 +156,20 @@ export default function Page() {
           {/* Voice recording controls card */}
           <Tilt3D>
             <div className="glass-panel border-white/5 p-4 bg-gradient-to-br from-white/[0.01] to-[#8b5cf6]/[0.02] h-full">
-              <h3 className="text-xs font-bold tracking-wider text-gray-400 uppercase flex items-center space-x-1.5 mb-3">
+              <h2 className="text-xs font-bold tracking-wider text-gray-400 uppercase flex items-center space-x-1.5 mb-3">
                 <Sparkles className="w-4 h-4 text-violet-400" />
                 <span>Voice Capture Terminal</span>
-              </h3>
+              </h2>
               <Recorder
                 onStreamChange={handleStreamChange}
                 onTranscriptionComplete={handleTranscriptionComplete}
               />
             </div>
           </Tilt3D>
-        </div>
+        </section>
 
         {/* Center Panel: Main Transcription and AI Viewer */}
-        <div className="lg:col-span-5 flex flex-col">
+        <section className="lg:col-span-5 flex flex-col">
           <Tilt3D className="h-full">
             <TranscriptViewer
               record={selectedTranscript}
@@ -170,16 +177,16 @@ export default function Page() {
               onDelete={handleDeleteTranscript}
             />
           </Tilt3D>
-        </div>
+        </section>
 
         {/* Right Panel: Historical Archive Cabinet */}
-        <div className="lg:col-span-3 flex flex-col print:hidden">
+        <aside className="lg:col-span-3 flex flex-col print:hidden">
           <Tilt3D className="h-full">
             <div className="glass-panel border-white/5 p-4 flex flex-col h-full">
-              <h3 className="text-xs font-bold tracking-wider text-gray-400 uppercase flex items-center space-x-1.5 mb-3.5 border-b border-white/5 pb-2.5">
+              <h2 className="text-xs font-bold tracking-wider text-gray-400 uppercase flex items-center space-x-1.5 mb-3.5 border-b border-white/5 pb-2.5">
                 <History className="w-4 h-4 text-violet-400" />
                 <span>Voice Log Archives</span>
-              </h3>
+              </h2>
               
               {isLoadingHistory ? (
                 <div className="flex-1 flex flex-col items-center justify-center py-10 space-y-2">
@@ -197,7 +204,7 @@ export default function Page() {
               )}
             </div>
           </Tilt3D>
-        </div>
+        </aside>
 
       </div>
 
@@ -211,10 +218,13 @@ export default function Page() {
       </footer>
 
       {/* System Settings configuration modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      )}
     </main>
+    </>
   );
 }
