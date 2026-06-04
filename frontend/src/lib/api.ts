@@ -100,19 +100,33 @@ export const api = {
       headers['X-STT-Key'] = apiKey;
     }
 
-    const response = await fetch(`${API_BASE}/api/transcribe`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || `Transcription failed with status ${response.status}`);
+    try {
+      const response = await fetch(`${API_BASE}/api/transcribe`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Transcription failed with status ${response.status}`);
+      }
+
+      const data: TranscriptionResponse = await response.json();
+      return data.transcript;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Transcription request timed out. Using high-fidelity local browser fallback.');
+      }
+      throw err;
     }
-
-    const data: TranscriptionResponse = await response.json();
-    return data.transcript;
   },
 
   /** Save a text transcript directly (SpeechRecognition fallback) */
