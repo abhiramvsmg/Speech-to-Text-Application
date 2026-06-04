@@ -390,13 +390,29 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
     const engine = localStorage.getItem('sttEngine') || 'local';
     const key = localStorage.getItem('sttKey') || '';
     const language = localStorage.getItem('language') || 'en-US';
+    const capturedLiveTranscript = liveTranscript.trim();
 
     try {
       // Convert blob into file payload - since we encode as WAV in client, it's always WAV!
       const file = new File([blob], `mic_voice.wav`, { type: 'audio/wav' });
 
       // Trigger server REST transcription
-      const record = await api.transcribe(file, engine, key, language);
+      let record = await api.transcribe(file, engine, key, language);
+      
+      // OPTIMIZATION: If the server returned an empty or placeholder response, but the high-accuracy 
+      // browser-native Web Speech API successfully captured text during recording, use the client transcript!
+      if ((!record.text || record.text.includes('[No speech detected') || record.text.trim() === '') && capturedLiveTranscript) {
+        console.log('[Recorder] Server returned empty/placeholder transcript. Merging with browser-captured text.');
+        record = await api.saveRawTranscript({
+          title: record.title,
+          text: capturedLiveTranscript,
+          duration: duration,
+          language: language,
+          stt_engine: engine,
+          stt_key: key
+        });
+      }
+
       onTranscriptionComplete(record);
       playCyberSound('chime');
       setLiveTranscript(''); // clear live stream tray upon success
@@ -405,10 +421,10 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
       console.error('[Recorder] Upload/Transcription error:', err);
       
       // High-Fidelity Browser-native SpeechRecognition fallback
-      if (liveTranscript && liveTranscript.trim()) {
+      if (capturedLiveTranscript) {
         try {
           const fallbackRecord = await api.saveRawTranscript({
-            text: liveTranscript,
+            text: capturedLiveTranscript,
             duration: duration,
             language: language,
             stt_engine: engine,
