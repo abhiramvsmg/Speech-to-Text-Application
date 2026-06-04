@@ -272,14 +272,38 @@ export default function Page() {
                     <div className="glass-panel border-white/5 p-5 flex flex-col h-full relative overflow-hidden bg-gradient-to-br from-white/[0.01] to-[#8b5cf6]/[0.02]">
                       <div className="absolute top-0 right-0 w-24 h-24 bg-violet-600/10 rounded-full blur-2xl pointer-events-none" />
                       
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
                         <h2 className="text-xs font-bold tracking-wider text-gray-400 uppercase flex items-center space-x-1.5">
                           <Volume2 className="w-4 h-4 text-violet-400" />
                           <span>AURA Spectrometer Network</span>
                         </h2>
-                        <span className="text-[9px] font-extrabold tracking-wider bg-white/5 border border-white/10 px-2 py-0.5 rounded text-gray-400 capitalize">
-                          {visualizerStyle === 'sine' ? 'Sine Wave' : visualizerStyle === 'bars' ? 'Frequency' : visualizerStyle === 'circle' ? 'Ring Pulse' : visualizerStyle === '3d-spectrogram' ? '3D Spectrogram' : '3D Particle Sphere'}
-                        </span>
+                        
+                        {/* Interactive Spectrometer Style Toggles */}
+                        <div className="flex items-center flex-wrap gap-1 print:hidden bg-black/40 p-0.5 border border-white/5 rounded-lg select-none">
+                          {[
+                            { id: 'sine', label: 'Sine' },
+                            { id: 'bars', label: 'Bars' },
+                            { id: 'circle', label: 'Ring' },
+                            { id: '3d-spectrogram', label: '3D Terrain' },
+                            { id: '3d-particle-orbit', label: '3D Orbit' }
+                          ].map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                setVisualizerStyle(item.id);
+                                localStorage.setItem('visualizerStyle', item.id);
+                              }}
+                              className={`px-2 py-0.5 rounded text-[8px] font-extrabold tracking-wider uppercase transition-all duration-200 cursor-pointer ${
+                                visualizerStyle === item.id 
+                                  ? 'bg-violet-600 text-white shadow-sm shadow-violet-500/20'
+                                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                              }`}
+                              title={`Switch to ${item.label}`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       
                       {/* Audio visualizer canvas */}
