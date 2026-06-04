@@ -206,6 +206,65 @@ body::after {
   100% { transform: translate(-1%, -2%) scale(0.98); }
 }
 
+/* --- Premium 3D & Transition Keyframes --- */
+@keyframes card-float-3d {
+  0% { transform: translate3d(0, 0, 0) rotateX(0deg); }
+  50% { transform: translate3d(0, -6px, 15px) rotateX(1deg); }
+  100% { transform: translate3d(0, 0, 0) rotateX(0deg); }
+}
+
+@keyframes orb-glow-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 25px 2px var(--border-glow), inset 0 2px 4px rgba(255, 255, 255, 0.1); }
+  50% { transform: scale(1.04); box-shadow: 0 0 45px 8px var(--glow-primary), inset 0 2px 8px rgba(255, 255, 255, 0.25); }
+  100% { transform: scale(1); box-shadow: 0 0 25px 2px var(--border-glow), inset 0 2px 4px rgba(255, 255, 255, 0.1); }
+}
+
+@keyframes liquid-morph {
+  0% { border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%; }
+  33% { border-radius: 40% 60% 54% 46% / 49% 60% 40% 51%; }
+  66% { border-radius: 60% 40% 46% 54% / 60% 46% 54% 40%; }
+  100% { border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%; }
+}
+
+@keyframes laser-sweep-line {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 0.8; }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(220%); opacity: 0; }
+}
+
+@keyframes slide-drawer-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fade-in-up-cascade {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-card-float {
+  animation: card-float-3d 6s infinite ease-in-out;
+}
+
+.animate-orb-pulse {
+  animation: orb-glow-pulse 2.5s infinite ease-in-out;
+}
+
+.animate-liquid-orb {
+  animation: liquid-morph 4s infinite linear, orb-glow-pulse 1.8s infinite ease-in-out;
+}
+
+.animate-drawer-slide {
+  animation: slide-drawer-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-cascade-item {
+  opacity: 0;
+  animation: fade-in-up-cascade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
 /* --- Glassmorphism Core Elements --- */
 .glass-panel {
   background: var(--card-bg);

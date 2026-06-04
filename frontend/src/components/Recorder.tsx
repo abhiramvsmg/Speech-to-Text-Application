@@ -470,12 +470,44 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
     return `${m}:${s}`;
   };
 
+  const cancelRecording = () => {
+    if (isRecording) {
+      setIsRecording(false);
+      setIsPaused(false);
+      isPausedRef.current = false;
+      stopTimer();
+      cleanupStream();
+      
+      // Clean up audio graph nodes
+      if (processorNodeRef.current) {
+        try { processorNodeRef.current.disconnect(); } catch {}
+        processorNodeRef.current = null;
+      }
+      if (audioInputRef.current) {
+        try { audioInputRef.current.disconnect(); } catch {}
+        audioInputRef.current = null;
+      }
+      if (audioContextRef.current) {
+        try { audioContextRef.current.close(); } catch {}
+        audioContextRef.current = null;
+      }
+
+      pcmBuffersRef.current = [];
+      pcmLengthRef.current = 0;
+      setDuration(0);
+      setLiveTranscript('');
+      playCyberSound('click');
+      setError('Recording session reset.');
+    }
+  };
+
   return (
-    <div className="space-y-4 preserve-3d" style={{ transformStyle: 'preserve-3d' }}>
+    <div className="space-y-6 preserve-3d flex flex-col items-center justify-center" style={{ transformStyle: 'preserve-3d' }}>
+      
       {/* Mode Selector Capsule Toggle */}
       <div 
         style={{ transform: 'translateZ(15px)' }}
-        className="flex items-center justify-between p-1 bg-black/40 border border-white/5 rounded-xl shadow-inner max-w-xs mx-auto"
+        className="flex items-center justify-between p-1 bg-black/40 border border-white/5 rounded-xl shadow-inner w-full max-w-xs mx-auto print:hidden"
       >
         <button
           id="recorder-mode-mic-btn"
@@ -502,110 +534,122 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
       </div>
 
       {inputMode === 'mic' ? (
-        <>
-          {/* Visual Status Indicator Panel */}
+        <div className="w-full flex flex-col items-center justify-center space-y-6 preserve-3d" style={{ transformStyle: 'preserve-3d' }}>
+          
+          {/* Holographic Recording Centerpiece Orb */}
           <div 
-            style={{ transform: 'translateZ(20px)', transformStyle: 'preserve-3d' }}
-            className="flex items-center justify-between p-3.5 glass-panel border-white/5 bg-white/[0.02] preserve-3d"
+            style={{ transform: 'translateZ(30px)', transformStyle: 'preserve-3d' }} 
+            className="relative flex items-center justify-center my-4 preserve-3d"
           >
-            <div className="flex items-center space-x-3 preserve-3d">
-              <div className="relative flex items-center justify-center">
-                {isRecording && !isPaused && <div className="recording-ring" />}
-                <div className={`w-3.5 h-3.5 rounded-full transition-colors duration-500 ${
-                  isRecording
-                    ? isPaused 
-                      ? 'bg-amber-400 animate-pulse'
-                      : 'bg-pink-500 shadow-[0_0_12px_2px_#ec4899]'
-                    : 'bg-gray-600'
-                }`} />
-              </div>
-              <span className="text-xs font-semibold tracking-wide text-gray-300 uppercase">
-                {isUploading 
-                  ? 'Analyzing Speech...' 
-                  : isRecording 
-                    ? isPaused ? 'Recording Paused' : 'Recording Voice' 
-                    : 'System Ready'}
-              </span>
-            </div>
-            <span className="text-sm font-mono font-bold text-white tabular-nums bg-black/40 px-2.5 py-1 rounded border border-white/5 shadow-inner">
-              {formatTime(duration)}
-            </span>
-          </div>
+            {/* Shifting radial mesh backdrop glow */}
+            <div className={`absolute w-48 h-48 rounded-full blur-2xl opacity-40 transition-all duration-700 ${
+              isRecording 
+                ? isPaused 
+                  ? 'bg-amber-500 scale-105'
+                  : 'bg-gradient-to-tr from-pink-500 to-rose-500 scale-110 animate-pulse'
+                : 'bg-gradient-to-tr from-violet-600 to-pink-500 scale-95 group-hover:scale-100'
+            }`} />
 
-          {/* Main Trigger Console */}
-          <div 
-            style={{ transform: 'translateZ(35px)', transformStyle: 'preserve-3d' }}
-            className="flex items-center justify-center py-2 preserve-3d"
-          >
-            {!isRecording ? (
-              <div className="relative group p-4 preserve-3d" style={{ transformStyle: 'preserve-3d' }}>
-                {/* Ambient neon backdrop blur */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-violet-600 to-pink-500 blur-xl opacity-35 group-hover:opacity-55 transition-opacity" />
-                
-                <button
-                  id="recorder-mic-start-btn"
-                  onClick={startRecording}
-                  disabled={isUploading}
-                  className="relative w-20 h-20 rounded-full flex items-center justify-center transition-all bg-gradient-to-b from-[#1c1a2e] to-[#0a0812] border border-violet-500/30 text-white hover:border-violet-500/60 shadow-[0_10px_20px_rgba(0,0,0,0.5),_inset_0_2px_3px_rgba(255,255,255,0.1)] active:scale-95 group overflow-hidden cursor-pointer"
-                >
-                  {/* Inner glowing core with 3D inset shadow */}
-                  <div className="absolute inset-1.5 rounded-full bg-gradient-to-tr from-violet-600 to-pink-500 shadow-[inset_0_2px_4px_rgba(255,255,255,0.25)] flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
-                    <Mic className="w-8 h-8 text-white transition-transform duration-300 group-hover:scale-115" />
-                  </div>
-                  
-                  {/* Physical button shine reflection */}
-                  <div className="absolute top-0 left-0 right-0 h-[50%] bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-8">
-                {/* Pause/Resume button */}
-                {isPaused ? (
-                  <button
-                    id="recorder-mic-resume-btn"
-                    onClick={resumeRecording}
-                    className="w-13 h-13 rounded-full flex items-center justify-center bg-gradient-to-b from-[#2e2a1a] to-[#141208] border border-amber-500/30 text-amber-400 hover:text-amber-300 hover:border-amber-500/60 shadow-[0_8px_16px_rgba(0,0,0,0.4),_inset_0_2px_2px_rgba(255,255,255,0.05)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                    title="Resume recording"
-                  >
-                    <Play className="w-5 h-5 fill-current" />
-                  </button>
-                ) : (
-                  <button
-                    id="recorder-mic-pause-btn"
-                    onClick={pauseRecording}
-                    className="w-13 h-13 rounded-full flex items-center justify-center bg-gradient-to-b from-[#1c1a2e] to-[#0a0812] border border-violet-500/25 text-gray-300 hover:text-white hover:border-violet-500/50 shadow-[0_8px_16px_rgba(0,0,0,0.4),_inset_0_2px_2px_rgba(255,255,255,0.05)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                    title="Pause recording"
-                  >
-                    <Pause className="w-5 h-5" />
-                  </button>
-                )}
-
-                {/* Stop and compile button */}
-                <div className="relative group">
-                  <div className="absolute inset-0 rounded-full bg-pink-500 blur-lg opacity-40 animate-pulse" />
-                  <button
-                    id="recorder-mic-stop-btn"
-                    onClick={stopRecording}
-                    className="relative w-18 h-18 rounded-full flex items-center justify-center bg-gradient-to-b from-[#2e0f1d] to-[#0f0308] border border-pink-500/40 text-pink-400 hover:text-pink-300 hover:border-pink-500/70 shadow-[0_10px_20px_rgba(0,0,0,0.5),_inset_0_2px_3px_rgba(255,255,255,0.1)] hover:scale-105 active:scale-95 transition-all group overflow-hidden cursor-pointer"
-                    title="Stop recording & transcribe"
-                  >
-                    <div className="absolute inset-1 rounded-full bg-gradient-to-tr from-pink-600 to-rose-500 shadow-[inset_0_2px_4px_rgba(255,255,255,0.25)] flex items-center justify-center">
-                      <Square className="w-5 h-5 text-white fill-white transition-transform group-hover:scale-90" />
-                    </div>
-                  </button>
-                </div>
-              </div>
+            {/* Ripple sound waves expanding outward */}
+            {isRecording && !isPaused && (
+              <>
+                <div className="absolute inset-[-12px] rounded-full border border-pink-500/20 animate-[ring-pulse_2s_infinite]" />
+                <div className="absolute inset-[-24px] rounded-full border border-violet-500/10 animate-[ring-pulse_2.8s_infinite]" style={{ animationDelay: '0.6s' }} />
+              </>
             )}
+
+            {/* Core physical interactive Orb button */}
+            <button
+              id="recorder-mic-core-orb"
+              onClick={() => {
+                if (!isRecording) startRecording();
+                else if (isPaused) resumeRecording();
+                else pauseRecording();
+              }}
+              disabled={isUploading}
+              style={{ transform: 'translateZ(10px)' }}
+              className={`w-36 h-36 rounded-full flex flex-col items-center justify-center text-white border select-none transition-all duration-500 hover:scale-105 cursor-pointer z-10 relative overflow-hidden backdrop-blur-md ${
+                isRecording
+                  ? isPaused
+                    ? 'border-amber-500 bg-amber-950/20 text-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.25)] animate-orb-pulse'
+                    : 'border-pink-500 bg-pink-950/15 text-white animate-liquid-orb'
+                  : 'border-violet-500/25 bg-gradient-to-b from-white/[0.03] to-[#8b5cf6]/[0.05] hover:border-violet-500/50 shadow-[0_12px_36px_rgba(0,0,0,0.4),_inset_0_1px_2px_rgba(255,255,255,0.1)] active:scale-98 animate-card-float'
+              }`}
+            >
+              {/* Inner details based on state */}
+              {!isRecording ? (
+                <>
+                  <Mic className="w-10 h-10 text-violet-400 hover:text-white transition-colors duration-300" />
+                  <span className="text-[9px] font-extrabold tracking-widest text-violet-300/80 uppercase mt-2">TAP TO START</span>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center space-y-1 z-20">
+                  {/* Timer display */}
+                  <span className="text-xl font-mono font-bold tracking-tight text-white tabular-nums">
+                    {formatTime(duration)}
+                  </span>
+                  
+                  {/* Small icon indication */}
+                  {isPaused ? (
+                    <div className="flex flex-col items-center space-y-0.5 animate-pulse">
+                      <Play className="w-4 h-4 text-amber-400 fill-amber-400" />
+                      <span className="text-[7.5px] font-extrabold tracking-widest text-amber-400 uppercase">RESUME</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center space-y-0.5">
+                      <div className="flex items-end space-x-0.5 h-3 my-0.5">
+                        <span className="w-0.5 bg-pink-400 rounded-full h-full animate-[wave_0.8s_infinite] origin-bottom" style={{ animationDelay: '0.1s' }} />
+                        <span className="w-0.5 bg-white rounded-full h-2/3 animate-[wave_0.5s_infinite] origin-bottom" style={{ animationDelay: '0.3s' }} />
+                        <span className="w-0.5 bg-pink-400 rounded-full h-full animate-[wave_0.7s_infinite] origin-bottom" style={{ animationDelay: '0.5s' }} />
+                      </div>
+                      <span className="text-[7.5px] font-extrabold tracking-widest text-pink-300 uppercase">PAUSE</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Physical glass glare overlay */}
+              <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent h-[50%] pointer-events-none" />
+            </button>
           </div>
+
+          {/* Secondary Controls: Save & Cancel Buttons (only shown in active recording states) */}
+          {isRecording && (
+            <div 
+              style={{ transform: 'translateZ(20px)' }}
+              className="flex items-center justify-center space-x-6 animate-drawer-slide z-20"
+            >
+              {/* Reset/Cancel button */}
+              <button
+                id="recorder-mic-cancel-btn"
+                onClick={cancelRecording}
+                className="px-4 py-2 text-[9px] font-bold tracking-wider uppercase bg-white/5 hover:bg-rose-500/10 border border-white/5 hover:border-rose-500/25 text-gray-400 hover:text-rose-400 rounded-xl transition-all cursor-pointer hover:scale-105 active:scale-95"
+                title="Discard recording session"
+              >
+                Reset Clip
+              </button>
+
+              {/* Stop & compile session */}
+              <button
+                id="recorder-mic-stop-btn"
+                onClick={stopRecording}
+                className="px-5 py-2.5 text-[9px] font-extrabold tracking-wider uppercase bg-gradient-to-r from-pink-600 to-rose-500 border border-white/10 hover:border-pink-400 text-white rounded-xl shadow-[0_4px_12px_rgba(236,72,153,0.3)] transition-all cursor-pointer hover:scale-105 active:scale-95 flex items-center space-x-1.5"
+                title="Transcribe session"
+              >
+                <Square className="w-3.5 h-3.5 fill-current text-white" />
+                <span>Compile Note</span>
+              </button>
+            </div>
+          )}
 
           {/* Live Transcript Capture Feed tray */}
           {isRecording && liveTranscript && (
             <div 
               style={{ transform: 'translateZ(25px)' }}
-              className="p-3 bg-[#08060f]/60 border border-violet-500/10 rounded-xl relative overflow-hidden animate-fade-in shadow-inner"
+              className="p-3 bg-[#08060f]/60 border border-violet-500/10 rounded-xl relative overflow-hidden animate-fade-in shadow-inner w-full text-center"
             >
               <div className="absolute top-0 bottom-0 left-0 w-1 bg-gradient-to-b from-violet-500 to-pink-500" />
-              <div className="flex items-center space-x-1.5 mb-1.5">
+              <div className="flex items-center justify-center space-x-1.5 mb-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-ping" />
                 <span className="text-[9px] font-bold tracking-wider text-violet-400 uppercase">Live Speech Feed</span>
               </div>
@@ -619,15 +663,15 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
           {isUploading && (
             <div className="flex items-center justify-center space-x-2 py-1 text-violet-400 animate-pulse text-xs font-medium">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Encoding audio stream & compiling transcription...</span>
+              <span>Analyzing Speech...</span>
             </div>
           )}
-        </>
+        </div>
       ) : (
         /* Direct Text Memo Pad Container */
         <div 
           style={{ transform: 'translateZ(20px)', transformStyle: 'preserve-3d' }}
-          className="space-y-4 p-4 glass-panel border-white/5 bg-white/[0.01] preserve-3d"
+          className="space-y-4 p-4 glass-panel border-white/5 bg-white/[0.01] w-full preserve-3d"
         >
           <div className="space-y-1">
             <label className="text-[9px] font-extrabold tracking-wider text-violet-400 uppercase">

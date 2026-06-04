@@ -250,7 +250,7 @@ export function NeuralSynthesizerCanvas({ actionName }: NeuralSynthesizerCanvasP
 }
 
 // -----------------------------------------------------------------
-// COGNITIVE VOCAL SENTIMENT RADAR SPECTRUM CANVAS CHART
+// COGNITIVE LINGUISTIC SENTIMENT SPEEDOMETER GAUGE CHART
 // -----------------------------------------------------------------
 interface SentimentData {
   joy: number;
@@ -260,11 +260,11 @@ interface SentimentData {
   urgent: number;
 }
 
-interface VocalSentimentRadarProps {
+interface LinguisticSentimentSpeedometerProps {
   sentiment: SentimentData;
 }
 
-export function VocalSentimentRadar({ sentiment }: VocalSentimentRadarProps) {
+export function LinguisticSentimentSpeedometer({ sentiment }: LinguisticSentimentSpeedometerProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   
   React.useEffect(() => {
@@ -288,99 +288,115 @@ export function VocalSentimentRadar({ sentiment }: VocalSentimentRadarProps) {
     resize();
     window.addEventListener('resize', resize);
     
-    const labels = ["Joy", "Calm", "Confident", "Analytical", "Urgent"];
-    const values = [sentiment.joy, sentiment.calm, sentiment.confident, sentiment.analytical, sentiment.urgent];
-    let progress = 0;
+    // Weighted scoring mapping: urgent (10), analytical (45), confident (65), calm (80), joy (95)
+    const { urgent, analytical, confident, calm, joy } = sentiment;
+    const total = urgent + analytical + confident + calm + joy || 1;
+    const score = Math.max(5, Math.min(95, (urgent * 10 + analytical * 45 + confident * 65 + calm * 80 + joy * 95) / total));
+    
+    let currentScore = 0;
+    const easeSpeed = 0.05;
     
     const render = () => {
       ctx.clearRect(0, 0, width, height);
-      if (progress < 1) progress += 0.035;
+      currentScore += (score - currentScore) * easeSpeed;
       
       const centerX = width / 2;
-      const centerY = height / 2;
-      const radius = Math.min(width, height) * 0.33;
+      const centerY = height * 0.78;
+      const radius = Math.min(width, height) * 0.52;
       
       const isLight = typeof window !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'holographic-light';
       
-      // Draw radar target rings
-      ctx.lineWidth = 0.8;
-      const levels = [0.25, 0.5, 0.75, 1];
-      levels.forEach(level => {
-        ctx.strokeStyle = isLight 
-          ? `rgba(124, 58, 237, ${level * 0.09})` 
-          : `rgba(255, 255, 255, ${level * 0.08})`;
-        ctx.beginPath();
-        for (let i = 0; i < 5; i++) {
-          const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
-          const x = centerX + Math.cos(angle) * radius * level;
-          const y = centerY + Math.sin(angle) * radius * level;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-        ctx.stroke();
-      });
+      ctx.lineWidth = 14;
+      ctx.lineCap = 'round';
       
-      // Draw axis spokes
-      ctx.strokeStyle = isLight ? 'rgba(124, 58, 237, 0.08)' : 'rgba(255, 255, 255, 0.07)';
-      for (let i = 0; i < 5; i++) {
-        const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY);
-        ctx.lineTo(centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius);
-        ctx.stroke();
-      }
+      const startAngle = 0.85 * Math.PI;
+      const endAngle = 2.15 * Math.PI;
+      const totalAngle = endAngle - startAngle;
       
-      // Plot sentiment shape
-      ctx.strokeStyle = isLight ? 'rgba(124, 58, 237, 0.85)' : 'rgba(139, 92, 246, 0.85)';
-      ctx.lineWidth = 2;
-      ctx.shadowColor = isLight ? 'rgba(124, 58, 237, 0.25)' : 'rgba(139, 92, 246, 0.4)';
-      ctx.shadowBlur = 8;
-      
+      // Arc track background
+      ctx.strokeStyle = isLight ? 'rgba(124, 58, 237, 0.06)' : 'rgba(255, 255, 255, 0.04)';
       ctx.beginPath();
-      for (let i = 0; i < 5; i++) {
-        const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
-        const valRatio = (values[i] / 100) * progress;
-        const x = centerX + Math.cos(angle) * radius * valRatio;
-        const y = centerY + Math.sin(angle) * radius * valRatio;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      
-      const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-      grad.addColorStop(0, isLight ? 'rgba(124, 58, 237, 0.07)' : 'rgba(139, 92, 246, 0.1)');
-      grad.addColorStop(1, isLight ? 'rgba(219, 39, 119, 0.25)' : 'rgba(236, 72, 153, 0.3)');
-      ctx.fillStyle = grad;
-      ctx.fill();
+      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
       ctx.stroke();
-      ctx.shadowBlur = 0;
       
-      // Node nodes & text tags
-      for (let i = 0; i < 5; i++) {
-        const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
-        const valRatio = (values[i] / 100) * progress;
-        const x = centerX + Math.cos(angle) * radius * valRatio;
-        const y = centerY + Math.sin(angle) * radius * valRatio;
+      // Arc gradient
+      const gradient = ctx.createLinearGradient(centerX - radius, centerY, centerX + radius, centerY);
+      gradient.addColorStop(0, '#f43f5e'); // Urgent/Anxious (Pink/Red)
+      gradient.addColorStop(0.25, '#f59e0b'); // Energetic (Amber)
+      gradient.addColorStop(0.5, '#10b981'); // Professional (Emerald)
+      gradient.addColorStop(0.75, '#3b82f6'); // Analytical (Blue)
+      gradient.addColorStop(1, '#a78bfa'); // Calm (Purple/Lavender)
+      
+      ctx.strokeStyle = gradient;
+      const valAngle = startAngle + (currentScore / 100) * totalAngle;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, startAngle, valAngle);
+      ctx.stroke();
+      
+      // Tick marks
+      ctx.lineWidth = 1;
+      const ticksCount = 11;
+      for (let i = 0; i < ticksCount; i++) {
+        const tickRatio = i / (ticksCount - 1);
+        const angle = startAngle + tickRatio * totalAngle;
+        const startX = centerX + Math.cos(angle) * (radius - 12);
+        const startY = centerY + Math.sin(angle) * (radius - 12);
+        const endX = centerX + Math.cos(angle) * (radius - 20);
+        const endY = centerY + Math.sin(angle) * (radius - 20);
         
+        ctx.strokeStyle = isLight ? 'rgba(28, 25, 38, 0.15)' : 'rgba(255, 255, 255, 0.12)';
         ctx.beginPath();
-        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = isLight ? '#7c3aed' : '#ffffff';
-        ctx.strokeStyle = isLight ? '#db2777' : '#f472b6';
-        ctx.lineWidth = 1.5;
-        ctx.fill();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
         ctx.stroke();
-        
-        const labelDist = radius * 1.22;
-        const lx = centerX + Math.cos(angle) * labelDist;
-        const ly = centerY + Math.sin(angle) * labelDist;
-        
-        ctx.font = 'bold 8px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = isLight ? '#3b374d' : 'rgba(226, 232, 240, 0.85)';
-        ctx.fillText(`${labels[i]} (${Math.round(values[i] * progress)}%)`, lx, ly);
       }
+      
+      // Glowing speedometer needle pointer
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(valAngle);
+      
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = isLight ? '#7c3aed' : '#f472b6';
+      ctx.shadowColor = isLight ? 'rgba(124, 58, 237, 0.5)' : '#ec4899';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(radius - 16, 0);
+      ctx.stroke();
+      ctx.restore();
+      
+      // Center needle hub pivot
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = isLight ? '#7c3aed' : '#ffffff';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = isLight ? '#f472b6' : '#ec4899';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Digital readout score
+      ctx.font = 'bold 20px monospace';
+      ctx.fillStyle = isLight ? '#1c1926' : '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.round(currentScore)}%`, centerX, centerY - 28);
+      
+      // Mood rating text
+      let moodName = "Neutral";
+      let moodColor = isLight ? '#3b374d' : '#94a3b8';
+      if (currentScore < 20) { moodName = "Anxious / Urgent 🚨"; moodColor = '#f43f5e'; }
+      else if (currentScore < 40) { moodName = "Energetic / High Tempo ⚡"; moodColor = '#f59e0b'; }
+      else if (currentScore < 60) { moodName = "Professional / Focused 💼"; moodColor = '#10b981'; }
+      else if (currentScore < 80) { moodName = "Analytical / Deliberate 🎓"; moodColor = '#3b82f6'; }
+      else { moodName = "Calm & Synced 🧘"; moodColor = '#a78bfa'; }
+      
+      ctx.font = 'bold 8px monospace';
+      ctx.fillStyle = moodColor;
+      ctx.fillText(moodName.toUpperCase(), centerX, centerY - 8);
       
       animationId = requestAnimationFrame(render);
     };
@@ -399,6 +415,7 @@ export function VocalSentimentRadar({ sentiment }: VocalSentimentRadarProps) {
     </div>
   );
 }
+
 
 // -----------------------------------------------------------------
 // COGNITIVE SENTIMENT SENTENCE TRAJECTORY TIMELINE GRAPH
@@ -2235,7 +2252,7 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
                   </div>
                 </div>
 
-                {/* Vocal Sentiment Radar Spectrum */}
+                {/* Linguistic Sentiment Speedometer */}
                 <div 
                   id="sentiment-radar-card"
                   style={{ transform: 'translateZ(42px)', transformStyle: 'preserve-3d' }}
@@ -2244,12 +2261,12 @@ export default function TranscriptViewer({ record, onUpdate, onDelete }: Transcr
                   <div className="flex items-center justify-between mb-2 border-b border-white/5 pb-2">
                     <div className="flex items-center space-x-2">
                       <span className="w-1.5 h-4 bg-gradient-to-b from-violet-500 to-pink-500 rounded-sm" />
-                      <h3 className="text-white font-extrabold text-xs tracking-wider uppercase">Vocal Sentiment Radar Spectrum</h3>
+                      <h3 className="text-white font-extrabold text-xs tracking-wider uppercase">Linguistic Sentiment Speedometer Gauge</h3>
                     </div>
                   </div>
                   
                   <div className="flex-1 min-h-[160px]">
-                    <VocalSentimentRadar sentiment={sentimentData} />
+                    <LinguisticSentimentSpeedometer sentiment={sentimentData} />
                   </div>
                 </div>
 
