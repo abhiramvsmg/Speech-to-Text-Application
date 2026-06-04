@@ -167,15 +167,23 @@ export default function Recorder({ onTranscriptionComplete, onStreamChange }: Re
   // Clean up recording stream, timer, and recognition on unmount
   useEffect(() => {
     return () => {
-      stopTimer();
-      cleanupStream();
+      // Clear timer directly
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      // Clean up stream tracks directly
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      // Stop recognition directly
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch {}
       }
     };
-  }, [stopTimer, cleanupStream]);
+  }, []);
 
   const startRecording = async () => {
     setError(null);

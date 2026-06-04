@@ -96,15 +96,15 @@ export default function Page() {
   }, []);
 
   // 2. Stream and Playback triggers
-  const handleStreamChange = (stream: MediaStream | null) => {
+  const handleStreamChange = React.useCallback((stream: MediaStream | null) => {
     setActiveStream(stream);
     setIsRecording(stream !== null);
-  };
+  }, []);
 
-  const handleAudioPlayChange = (element: HTMLAudioElement | null, playing: boolean) => {
+  const handleAudioPlayChange = React.useCallback((element: HTMLAudioElement | null, playing: boolean) => {
     setActiveAudioElement(element);
     setIsPlaying(playing);
-  };
+  }, []);
 
   // 3. Document mutation callbacks
   const handleTranscriptionComplete = (record: TranscriptRecord) => {
